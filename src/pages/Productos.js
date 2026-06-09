@@ -2,11 +2,19 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Plus, Pencil, Trash2, X, PackagePlus, Scissors } from 'lucide-react';
 
-const EMPTY = { nombre:'', categoria:'Aves', etapa:'', pSaco:0, pMedio:0, pArroba:0, pKilo:0, sacos:0, granel:0 };
+const EMPTY = {
+  nombre:'', categoria:'Aves', etapa:'', tipoVenta:'sacos',
+  pSaco:0, pMedio:0, pArroba:0, pKilo:0, pUnidad:0,
+  sacos:0, granel:0, unidades:0
+};
+const CATEGORIAS_DEFAULT = ['Aves','Cerdos','Medicinas','Equipos Avícolas','Otros'];
 
-function ProductModal({ producto, onClose, onSave }) {
+function ProductModal({ producto, onClose, onSave, todasCategorias }) {
   const [form, setForm] = useState(producto || EMPTY);
+  const [catPersonalizada, setCatPersonalizada] = useState('');
   const f = (k,v) => setForm(p=>({...p,[k]:v}));
+  const categorias = [...new Set([...CATEGORIAS_DEFAULT, ...todasCategorias])];
+
   return (
     <div className="modal-overlay">
       <div className="modal" style={{maxWidth:560}}>
@@ -16,35 +24,72 @@ function ProductModal({ producto, onClose, onSave }) {
         </div>
         <div className="modal-body">
           <div className="form-row">
-            <div className="form-group"><label className="form-label">Nombre *</label>
-              <input className="form-input" value={form.nombre} onChange={e=>f('nombre',e.target.value)}/></div>
-            <div className="form-group"><label className="form-label">Categoría</label>
-              <select className="form-select" value={form.categoria} onChange={e=>f('categoria',e.target.value)}>
-                <option>Aves</option><option>Cerdos</option>
-              </select></div>
-          </div>
-          <div className="form-group"><label className="form-label">Etapa</label>
-            <input className="form-input" value={form.etapa} onChange={e=>f('etapa',e.target.value)} placeholder="Crecimiento, Engorde, Postura..."/></div>
-          <div style={{fontWeight:600,fontSize:13,color:'var(--text-mid)',margin:'12px 0 8px'}}>Precios (S/)</div>
-          <div className="form-row">
-            <div className="form-group"><label className="form-label">Saco 40KG</label>
-              <input className="form-input" type="number" step="0.01" value={form.pSaco} onChange={e=>f('pSaco',parseFloat(e.target.value)||0)}/></div>
-            <div className="form-group"><label className="form-label">Medio 20KG</label>
-              <input className="form-input" type="number" step="0.01" value={form.pMedio} onChange={e=>f('pMedio',parseFloat(e.target.value)||0)}/></div>
+            <div className="form-group">
+              <label className="form-label">Nombre *</label>
+              <input className="form-input" value={form.nombre} onChange={e=>f('nombre',e.target.value)} placeholder="Nombre del producto"/>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tipo de venta</label>
+              <select className="form-select" value={form.tipoVenta||'sacos'} onChange={e=>f('tipoVenta',e.target.value)}>
+                <option value="sacos">Por sacos / granel</option>
+                <option value="unidad">Por unidad</option>
+              </select>
+            </div>
           </div>
           <div className="form-row">
-            <div className="form-group"><label className="form-label">Arroba 11.5KG</label>
-              <input className="form-input" type="number" step="0.01" value={form.pArroba} onChange={e=>f('pArroba',parseFloat(e.target.value)||0)}/></div>
-            <div className="form-group"><label className="form-label">Kilo</label>
-              <input className="form-input" type="number" step="0.01" value={form.pKilo} onChange={e=>f('pKilo',parseFloat(e.target.value)||0)}/></div>
+            <div className="form-group">
+              <label className="form-label">Categoría</label>
+              <select className="form-select" value={form.categoria} onChange={e=>{ if(e.target.value!=='__nueva__') f('categoria',e.target.value); }}>
+                {categorias.map(c=><option key={c} value={c}>{c}</option>)}
+                <option value="__nueva__">+ Agregar nueva...</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Nueva categoría (opcional)</label>
+              <input className="form-input" value={catPersonalizada}
+                onChange={e=>{ setCatPersonalizada(e.target.value); if(e.target.value) f('categoria',e.target.value); }}
+                placeholder="Ej: Vacunas, Herramientas..."/>
+            </div>
           </div>
-          <div style={{fontWeight:600,fontSize:13,color:'var(--text-mid)',margin:'12px 0 8px'}}>Stock inicial</div>
-          <div className="form-row">
-            <div className="form-group"><label className="form-label">Sacos</label>
-              <input className="form-input" type="number" value={form.sacos} onChange={e=>f('sacos',parseInt(e.target.value)||0)}/></div>
-            <div className="form-group"><label className="form-label">Granel (kg)</label>
-              <input className="form-input" type="number" step="0.1" value={form.granel} onChange={e=>f('granel',parseFloat(e.target.value)||0)}/></div>
+          <div className="form-group">
+            <label className="form-label">Descripción / Etapa</label>
+            <input className="form-input" value={form.etapa} onChange={e=>f('etapa',e.target.value)} placeholder="Crecimiento, Vitamina, 5ml..."/>
           </div>
+
+          {(form.tipoVenta==='sacos'||!form.tipoVenta) ? (
+            <>
+              <div style={{fontWeight:600,fontSize:13,color:'var(--text-mid)',margin:'12px 0 8px'}}>Precios (S/)</div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Saco 40KG</label>
+                  <input className="form-input" type="number" step="0.01" value={form.pSaco} onChange={e=>f('pSaco',parseFloat(e.target.value)||0)}/></div>
+                <div className="form-group"><label className="form-label">Medio 20KG</label>
+                  <input className="form-input" type="number" step="0.01" value={form.pMedio} onChange={e=>f('pMedio',parseFloat(e.target.value)||0)}/></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Arroba 11.5KG</label>
+                  <input className="form-input" type="number" step="0.01" value={form.pArroba} onChange={e=>f('pArroba',parseFloat(e.target.value)||0)}/></div>
+                <div className="form-group"><label className="form-label">Kilo</label>
+                  <input className="form-input" type="number" step="0.01" value={form.pKilo} onChange={e=>f('pKilo',parseFloat(e.target.value)||0)}/></div>
+              </div>
+              <div style={{fontWeight:600,fontSize:13,color:'var(--text-mid)',margin:'12px 0 8px'}}>Stock inicial</div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Sacos</label>
+                  <input className="form-input" type="number" value={form.sacos} onChange={e=>f('sacos',parseInt(e.target.value)||0)}/></div>
+                <div className="form-group"><label className="form-label">Granel (kg)</label>
+                  <input className="form-input" type="number" step="0.1" value={form.granel} onChange={e=>f('granel',parseFloat(e.target.value)||0)}/></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{fontWeight:600,fontSize:13,color:'var(--text-mid)',margin:'12px 0 8px'}}>Precio por unidad (S/)</div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Precio unitario</label>
+                  <input className="form-input" type="number" step="0.01" value={form.pUnidad||0} onChange={e=>f('pUnidad',parseFloat(e.target.value)||0)}/></div>
+                <div className="form-group"><label className="form-label">Stock inicial (unidades)</label>
+                  <input className="form-input" type="number" value={form.unidades||0} onChange={e=>f('unidades',parseInt(e.target.value)||0)}/></div>
+              </div>
+            </>
+          )}
         </div>
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
@@ -56,20 +101,18 @@ function ProductModal({ producto, onClose, onSave }) {
 }
 
 function StockModal({ producto, tipo, onClose, onSave }) {
-  const [sacos, setSacos] = useState(0);
+  const [cantidad, setCantidad] = useState(0);
   const [nota, setNota] = useState('');
-
   const kgPorSaco = 40;
+  const esUnidad = producto.tipoVenta === 'unidad';
 
   const registrar = () => {
-    const cantidad = parseInt(sacos) || 0;
-    if (cantidad <= 0) return;
+    const cant = parseInt(cantidad) || 0;
+    if (cant <= 0) return;
     if (tipo === 'ingreso') {
-      // Ingreso: suma sacos al stock
-      onSave(producto.id, cantidad, 0, nota || `Ingreso ${cantidad} saco(s)`);
+      onSave(producto.id, esUnidad ? 0 : cant, 0, nota || `Ingreso ${cant} ${esUnidad?'unidad(es)':'saco(s)'}`, esUnidad ? cant : 0);
     } else {
-      // Apertura: descuenta sacos y suma kg al granel
-      onSave(producto.id, -cantidad, cantidad * kgPorSaco, nota || `Apertura ${cantidad} saco(s) → ${cantidad * kgPorSaco} kg granel`);
+      onSave(producto.id, -cant, cant * kgPorSaco, nota || `Apertura ${cant} saco(s) → ${cant * kgPorSaco} kg granel`, 0);
     }
     onClose();
   };
@@ -84,29 +127,24 @@ function StockModal({ producto, tipo, onClose, onSave }) {
         <div className="modal-body">
           <div style={{background:'var(--green-light)',padding:'10px 14px',borderRadius:8,marginBottom:16,fontSize:13}}>
             <strong>{producto.nombre}</strong>
-            <span style={{color:'var(--text-light)',marginLeft:12}}>Stock actual: {producto.sacos} sacos · {producto.granel.toFixed(1)} kg granel</span>
+            <span style={{color:'var(--text-light)',marginLeft:12}}>
+              {esUnidad ? `${producto.unidades||0} unidades` : `${producto.sacos} sacos · ${(producto.granel||0).toFixed(1)} kg granel`}
+            </span>
           </div>
           <div className="form-group">
             <label className="form-label">
-              {tipo==='ingreso' ? 'Sacos a ingresar' : 'Sacos a abrir (pasan a granel)'}
+              {esUnidad ? 'Unidades a ingresar' : tipo==='ingreso' ? 'Sacos a ingresar' : 'Sacos a abrir (pasan a granel)'}
             </label>
-            <input
-              className="form-input"
-              type="number"
-              min="1"
-              value={sacos}
-              onChange={e=>setSacos(e.target.value)}
-              placeholder="0"
-            />
-            {tipo==='apertura' && parseInt(sacos) > 0 && (
+            <input className="form-input" type="number" min="1" value={cantidad} onChange={e=>setCantidad(e.target.value)} placeholder="0"/>
+            {!esUnidad && tipo==='apertura' && parseInt(cantidad) > 0 && (
               <div style={{marginTop:6,fontSize:12,color:'var(--text-light)'}}>
-                Se descontarán <strong>{sacos} saco(s)</strong> y se agregarán <strong>{parseInt(sacos)*kgPorSaco} kg</strong> al granel
+                Se descontarán <strong>{cantidad} saco(s)</strong> y se agregarán <strong>{parseInt(cantidad)*kgPorSaco} kg</strong> al granel
               </div>
             )}
           </div>
           <div className="form-group">
             <label className="form-label">Nota (opcional)</label>
-            <input className="form-input" value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ej: Compra proveedor, Apertura para granel..."/>
+            <input className="form-input" value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ej: Compra proveedor..."/>
           </div>
         </div>
         <div className="modal-footer">
@@ -121,41 +159,56 @@ function StockModal({ producto, tipo, onClose, onSave }) {
 export default function Productos() {
   const { products, addProduct, updateProduct, deleteProduct, ingresarStock } = useApp();
   const [categoria, setCategoria] = useState('Aves');
-  const [modal, setModal] = useState(null); // null | {type:'add'|'edit'|'stock'|'apertura', producto?}
+  const [modal, setModal] = useState(null);
 
+  const todasCategorias = [...new Set(products.map(p=>p.categoria))];
+  const cats = [...new Set(['Aves','Cerdos',...todasCategorias])];
   const filtered = products.filter(p=>p.categoria===categoria);
 
   return (
     <div>
       <div className="header-row page-header">
-        <div><h1>Productos / Almacén</h1><p>Catálogo de alimentos balanceados, sacos sellados y a granel</p></div>
+        <div><h1>Productos / Almacén</h1><p>Catálogo de productos: concentrados, medicinas, equipos y más</p></div>
         <button className="btn btn-primary" onClick={()=>setModal({type:'add'})}><Plus size={15}/>Nuevo producto</button>
       </div>
-      <div className="category-tabs mb-4">
-        {['Aves','Cerdos'].map(cat=>(
+      <div className="category-tabs mb-4" style={{flexWrap:'wrap'}}>
+        {cats.map(cat=>(
           <button key={cat} className={`tab-btn ${categoria===cat?'active':''}`} onClick={()=>setCategoria(cat)}>{cat}</button>
         ))}
       </div>
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Producto</th><th>Etapa</th><th>P. Saco</th><th>P. Medio</th><th>P. Arroba</th><th>P. Kilo</th><th>Sacos</th><th>Granel (kg)</th><th className="text-right">Acciones</th></tr>
+            <tr>
+              <th>Producto</th><th>Etapa / Desc.</th><th>Tipo venta</th>
+              <th>P. Saco</th><th>P. Medio</th><th>P. Arroba</th><th>P. Kilo / Unid.</th>
+              <th>Stock</th><th className="text-right">Acciones</th>
+            </tr>
           </thead>
           <tbody>
-            {filtered.map(p=>(
+            {filtered.length === 0
+              ? <tr><td colSpan={9} className="text-center" style={{padding:32,color:'var(--text-light)'}}>No hay productos en esta categoría</td></tr>
+              : filtered.map(p=>(
               <tr key={p.id}>
                 <td><strong>{p.nombre}</strong></td>
-                <td><span className="badge badge-green">{p.etapa}</span></td>
-                <td>S/ {p.pSaco.toFixed(2)}</td>
-                <td>S/ {p.pMedio.toFixed(2)}</td>
-                <td>S/ {p.pArroba.toFixed(2)}</td>
-                <td>S/ {p.pKilo.toFixed(2)}</td>
-                <td><strong style={{color: p.sacos<5?'var(--red)':'inherit'}}>{p.sacos}</strong></td>
-                <td><strong>{p.granel.toFixed(2)}</strong></td>
+                <td>{p.etapa ? <span className="badge badge-green">{p.etapa}</span> : <span style={{color:'var(--text-light)'}}>—</span>}</td>
+                <td><span className={`badge ${p.tipoVenta==='unidad'?'badge-orange':'badge-gray'}`}>{p.tipoVenta==='unidad'?'Unidad':'Sacos/kg'}</span></td>
+                {p.tipoVenta==='unidad' ? (
+                  <><td colSpan={3} style={{color:'var(--text-light)'}}>—</td><td style={{fontWeight:600}}>S/ {(p.pUnidad||0).toFixed(2)}</td></>
+                ) : (
+                  <><td>S/ {p.pSaco.toFixed(2)}</td><td>S/ {p.pMedio.toFixed(2)}</td>
+                  <td>S/ {p.pArroba.toFixed(2)}</td><td>S/ {p.pKilo.toFixed(2)}</td></>
+                )}
+                <td>
+                  {p.tipoVenta==='unidad'
+                    ? <strong style={{color: (p.unidades||0)<3?'var(--red)':'inherit'}}>{p.unidades||0} und.</strong>
+                    : <><strong style={{color:p.sacos<5?'var(--red)':'inherit'}}>{p.sacos} sacos</strong><br/><span style={{fontSize:11,color:'var(--text-light)'}}>{(p.granel||0).toFixed(1)} kg</span></>
+                  }
+                </td>
                 <td className="text-right">
                   <div style={{display:'flex',gap:5,justifyContent:'flex-end'}}>
                     <button className="action-btn stock" title="Ingreso de stock" onClick={()=>setModal({type:'stock',producto:p})}><PackagePlus size={13}/></button>
-                    <button className="action-btn" style={{background:'#f0f0f0',color:'#666'}} title="Apertura de saco" onClick={()=>setModal({type:'apertura',producto:p})}><Scissors size={13}/></button>
+                    {p.tipoVenta!=='unidad' && <button className="action-btn" style={{background:'#f0f0f0',color:'#666'}} title="Apertura de saco" onClick={()=>setModal({type:'apertura',producto:p})}><Scissors size={13}/></button>}
                     <button className="action-btn edit" onClick={()=>setModal({type:'edit',producto:p})}><Pencil size={13}/></button>
                     <button className="action-btn del" onClick={()=>deleteProduct(p.id)}><Trash2 size={13}/></button>
                   </div>
@@ -166,12 +219,8 @@ export default function Productos() {
         </table>
       </div>
 
-      {modal?.type==='add' && (
-        <ProductModal onClose={()=>setModal(null)} onSave={addProduct}/>
-      )}
-      {modal?.type==='edit' && (
-        <ProductModal producto={modal.producto} onClose={()=>setModal(null)} onSave={updateProduct}/>
-      )}
+      {modal?.type==='add' && <ProductModal todasCategorias={todasCategorias} onClose={()=>setModal(null)} onSave={addProduct}/>}
+      {modal?.type==='edit' && <ProductModal producto={modal.producto} todasCategorias={todasCategorias} onClose={()=>setModal(null)} onSave={updateProduct}/>}
       {(modal?.type==='stock'||modal?.type==='apertura') && (
         <StockModal producto={modal.producto} tipo={modal.type==='stock'?'ingreso':'apertura'} onClose={()=>setModal(null)} onSave={ingresarStock}/>
       )}

@@ -39,11 +39,6 @@ export default function Login() {
               Ingresar al sistema
             </button>
           </form>
-          <div style={{marginTop:24,padding:16,background:'#f9f9f9',borderRadius:8,fontSize:12,color:'#666'}}>
-            <div style={{fontWeight:600,marginBottom:6,fontSize:11,textTransform:'uppercase',letterSpacing:'0.5px'}}>Usuarios de prueba</div>
-            <div><strong>Admin:</strong> admin@fercord.com / admin123</div>
-            <div><strong>Vendedor:</strong> vendedor@fercord.com / vendedor123</div>
-          </div>
         </div>
       </div>
       <div className="login-right">
