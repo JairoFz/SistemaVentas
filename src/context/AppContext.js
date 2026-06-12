@@ -3,15 +3,15 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AppContext = createContext();
 
 const INITIAL_PRODUCTS = [
-  { id: 1, nombre: 'Aves Crecimiento', categoria: 'Aves', etapa: 'Crecimiento', pSaco: 125, pMedio: 65, pArroba: 38, pKilo: 3.40, sacos: 19, granel: 15 },
-  { id: 2, nombre: 'Aves Engorde', categoria: 'Aves', etapa: 'Engorde', pSaco: 128, pMedio: 67, pArroba: 39, pKilo: 3.50, sacos: 21, granel: 0 },
-  { id: 3, nombre: 'Aves Inicio', categoria: 'Aves', etapa: 'Inicio', pSaco: 130, pMedio: 68, pArroba: 40, pKilo: 3.60, sacos: 24, granel: 7.5 },
-  { id: 4, nombre: 'Aves Postura', categoria: 'Aves', etapa: 'Postura', pSaco: 122, pMedio: 63, pArroba: 37, pKilo: 3.30, sacos: 24, granel: 0 },
-  { id: 5, nombre: 'Cerdos Crecimiento', categoria: 'Cerdos', etapa: 'Crecimiento', pSaco: 138, pMedio: 72, pArroba: 43, pKilo: 3.80, sacos: 15, granel: 0 },
-  { id: 6, nombre: 'Cerdos Engorde', categoria: 'Cerdos', etapa: 'Engorde', pSaco: 140, pMedio: 73, pArroba: 44, pKilo: 3.85, sacos: 18, granel: 0 },
-  { id: 7, nombre: 'Cerdos Gestación', categoria: 'Cerdos', etapa: 'Gestación', pSaco: 142, pMedio: 74, pArroba: 45, pKilo: 3.90, sacos: 12, granel: 0 },
-  { id: 8, nombre: 'Cerdos Lactación', categoria: 'Cerdos', etapa: 'Lactación', pSaco: 145, pMedio: 75, pArroba: 46, pKilo: 3.95, sacos: 10, granel: 0 },
-  { id: 9, nombre: 'Cerdos Inicio', categoria: 'Cerdos', etapa: 'Inicio', pSaco: 150, pMedio: 78, pArroba: 47, pKilo: 4.10, sacos: 8, granel: 0 },
+  { id: 1, nombre: 'Aves Crecimiento', categoria: 'Aves', etapa: 'Crecimiento', pSaco: 109, pMedio: 54.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 2, nombre: 'Aves Engorde', categoria: 'Aves', etapa: 'Engorde', pSaco: 108, pMedio: 54, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 3, nombre: 'Aves Inicio', categoria: 'Aves', etapa: 'Inicio', pSaco: 110, pMedio: 55, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 4, nombre: 'Aves Postura', categoria: 'Aves', etapa: 'Postura', pSaco: 100, pMedio: 50, pArroba: 31, pKilo: 2.80, sacos: 0, granel: 0 },
+  { id: 5, nombre: 'Cerdos Crecimiento', categoria: 'Cerdos', etapa: 'Crecimiento', pSaco: 109, pMedio: 54.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 6, nombre: 'Cerdos Engorde', categoria: 'Cerdos', etapa: 'Engorde', pSaco: 107, pMedio: 53.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 7, nombre: 'Cerdos Gestación', categoria: 'Cerdos', etapa: 'Gestación', pSaco: 142, pMedio: 74, pArroba: 45, pKilo: 3.90, sacos: 0, granel: 0 },
+  { id: 8, nombre: 'Cerdos Lactación', categoria: 'Cerdos', etapa: 'Lactación', pSaco: 145, pMedio: 75, pArroba: 46, pKilo: 3.95, sacos: 0, granel: 0 },
+  { id: 9, nombre: 'Cerdos Inicio', categoria: 'Cerdos', etapa: 'Inicio', pSaco: 118, pMedio: 59, pArroba: 35, pKilo: 3.20, sacos: 0, granel: 0 },
 ];
 
 const INITIAL_USERS = [
