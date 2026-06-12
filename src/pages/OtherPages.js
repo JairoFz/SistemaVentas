@@ -136,24 +136,6 @@ export function Reportes() {
           </tbody>
         </table>
 
-        ${rankingProductos.length > 0 ? `
-        <h3>Productos más vendidos</h3>
-        <table>
-          <thead>
-            <tr><th>#</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Total vendido</th></tr>
-          </thead>
-          <tbody>
-            ${rankingProductos.map((p,i)=>`
-              <tr>
-                <td>${i+1}</td>
-                <td>${p.nombre}</td>
-                <td style="text-align:right">${p.cantidad}</td>
-                <td style="text-align:right;font-weight:600">S/ ${p.total.toFixed(2)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        ` : ''}
 
         <div class="footer">
           <span>FERCORD - Nutrición Balanceada</span>

@@ -7,12 +7,13 @@ import VentasBoletas from './pages/VentasBoletas';
 import Clientes from './pages/Clientes';
 import Productos from './pages/Productos';
 import Kardex from './pages/Kardex';
+import Perfil from './pages/Perfil';
 import CajaDiaria from './pages/CajaDiaria';
 import { Reportes, Usuarios } from './pages/OtherPages';
 import { useState } from 'react';
 import {
   LayoutDashboard, ShoppingCart, Receipt, Users, Package,
-  BookOpen, Wallet, BarChart2, UserCog, LogOut
+  BookOpen, Wallet, BarChart2, UserCog, User, LogOut
 } from 'lucide-react';
 
 const NAV = [
@@ -25,6 +26,7 @@ const NAV = [
   { id:'caja', label:'Caja diaria', icon:Wallet },
   { id:'reportes', label:'Reportes', icon:BarChart2 },
   { id:'usuarios', label:'Usuarios', icon:UserCog },
+  { id:'perfil', label:'Perfil', icon:User},
 ];
 
 function MainApp() {
@@ -44,6 +46,7 @@ function MainApp() {
       case 'caja': return <CajaDiaria />;
       case 'reportes': return <Reportes />;
       case 'usuarios': return <Usuarios />;
+      case 'perfil': return <Perfil />;
       default: return <Dashboard />;
     }
   };
