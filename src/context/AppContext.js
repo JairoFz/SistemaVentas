@@ -63,6 +63,22 @@ export function AppProvider({ children }) {
 
   const addUser = (u) => setUsers(prev => [...prev, { ...u, id: Date.now() }]);
   const deleteUser = (id) => setUsers(prev => prev.filter(x => x.id !== id));
+  const updateUser = (u) => {
+    setUsers(prev => prev.map(x => x.id === u.id ? {...x, ...u} : x));
+    if (currentUser?.id === u.id) {
+      const updated = {...currentUser, ...u};
+      setCurrentUser(updated);
+      save('fercord_user', updated);
+    }
+  };
+
+  // Cambia contraseña validando la actual. Retorna true/false.
+  const changePassword = (userId, actual, nueva) => {
+    const user = users.find(u => u.id === userId);
+    if (!user || user.password !== actual) return false;
+    updateUser({ id: userId, password: nueva });
+    return true;
+  };
 
   const registrarVenta = (venta) => {
     const codigo = venta.tipo === 'factura'
@@ -152,7 +168,7 @@ export function AppProvider({ children }) {
       clients, addClient, updateClient, deleteClient,
       ventas, registrarVenta,
       kardex, ingresarStock,
-      users, addUser, deleteUser,
+      users, addUser, deleteUser, updateUser, changePassword,
       cajaAbierta, abrirCaja, cerrarCaja, movimientosCaja, agregarMovimientoCaja,
       ventasHoy, ventasSemana, stockBajo,
     }}>
