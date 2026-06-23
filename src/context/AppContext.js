@@ -3,15 +3,15 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AppContext = createContext();
 
 const INITIAL_PRODUCTS = [
-  { id: 1, nombre: 'Aves Crecimiento', categoria: 'Aves', etapa: 'Crecimiento', pSaco: 109, pMedio: 54.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
-  { id: 2, nombre: 'Aves Engorde', categoria: 'Aves', etapa: 'Engorde', pSaco: 108, pMedio: 54, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
-  { id: 3, nombre: 'Aves Inicio', categoria: 'Aves', etapa: 'Inicio', pSaco: 110, pMedio: 55, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
-  { id: 4, nombre: 'Aves Postura', categoria: 'Aves', etapa: 'Postura', pSaco: 100, pMedio: 50, pArroba: 31, pKilo: 2.80, sacos: 0, granel: 0 },
-  { id: 5, nombre: 'Cerdos Crecimiento', categoria: 'Cerdos', etapa: 'Crecimiento', pSaco: 109, pMedio: 54.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
-  { id: 6, nombre: 'Cerdos Engorde', categoria: 'Cerdos', etapa: 'Engorde', pSaco: 107, pMedio: 53.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
-  { id: 7, nombre: 'Cerdos Gestación', categoria: 'Cerdos', etapa: 'Gestación', pSaco: 142, pMedio: 74, pArroba: 45, pKilo: 3.90, sacos: 0, granel: 0 },
-  { id: 8, nombre: 'Cerdos Lactación', categoria: 'Cerdos', etapa: 'Lactación', pSaco: 145, pMedio: 75, pArroba: 46, pKilo: 3.95, sacos: 0, granel: 0 },
-  { id: 9, nombre: 'Cerdos Inicio', categoria: 'Cerdos', etapa: 'Inicio', pSaco: 118, pMedio: 59, pArroba: 35, pKilo: 3.20, sacos: 0, granel: 0 },
+  { id: 1, nombre: 'Aves Crecimiento', categoria: 'Aves', etapa: 'Crecimiento', kgPorSaco: 40, pSaco: 109, pMedio: 54.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 2, nombre: 'Aves Engorde', categoria: 'Aves', etapa: 'Engorde', kgPorSaco: 40, pSaco: 108, pMedio: 54, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 3, nombre: 'Aves Inicio', categoria: 'Aves', etapa: 'Inicio', kgPorSaco: 40, pSaco: 110, pMedio: 55, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 4, nombre: 'Aves Postura', categoria: 'Aves', etapa: 'Postura', kgPorSaco: 40, pSaco: 100, pMedio: 50, pArroba: 31, pKilo: 2.80, sacos: 0, granel: 0 },
+  { id: 5, nombre: 'Cerdos Crecimiento', categoria: 'Cerdos', etapa: 'Crecimiento', kgPorSaco: 40, pSaco: 109, pMedio: 54.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 6, nombre: 'Cerdos Engorde', categoria: 'Cerdos', etapa: 'Engorde', kgPorSaco: 40, pSaco: 107, pMedio: 53.5, pArroba: 33, pKilo: 3, sacos: 0, granel: 0 },
+  { id: 7, nombre: 'Cerdos Gestación', categoria: 'Cerdos', etapa: 'Gestación', kgPorSaco: 40, pSaco: 142, pMedio: 74, pArroba: 45, pKilo: 3.90, sacos: 0, granel: 0 },
+  { id: 8, nombre: 'Cerdos Lactación', categoria: 'Cerdos', etapa: 'Lactación', kgPorSaco: 40, pSaco: 145, pMedio: 75, pArroba: 46, pKilo: 3.95, sacos: 0, granel: 0 },
+  { id: 9, nombre: 'Cerdos Inicio', categoria: 'Cerdos', etapa: 'Inicio', kgPorSaco: 40, pSaco: 118, pMedio: 59, pArroba: 35, pKilo: 3.20, sacos: 0, granel: 0 },
 ];
 
 const INITIAL_USERS = [
@@ -72,7 +72,6 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Cambia contraseña validando la actual. Retorna true/false.
   const changePassword = (userId, actual, nueva) => {
     const user = users.find(u => u.id === userId);
     if (!user || user.password !== actual) return false;
@@ -92,13 +91,33 @@ export function AppProvider({ children }) {
     venta.items.forEach(item => {
       setProducts(prev => prev.map(p => {
         if (p.id !== item.productoId) return p;
+        
         let nuevosSacos = p.sacos;
         let nuevosGranel = p.granel;
         let nota = '';
-        if (item.presentacion === 'saco') { nuevosSacos -= item.cantidad; nota = `Venta saco x${item.cantidad}`; }
-        else if (item.presentacion === 'medio') { nuevosGranel -= item.cantidad * 20; nota = `Venta medio x${item.cantidad}`; }
-        else if (item.presentacion === 'arroba') { nuevosGranel -= item.cantidad * 11.5; nota = `Venta arroba x${item.cantidad}`; }
-        else if (item.presentacion === 'kilo') { nuevosGranel -= item.cantidad; nota = `Venta kilo x${item.cantidad}`; }
+        const kgPorSaco = p.kgPorSaco || 40;
+
+        if (item.presentacion === 'saco') {
+          nuevosSacos -= item.cantidad;
+          nota = `Venta saco x${item.cantidad}`;
+        } else if (item.presentacion === 'medio') {
+          const kgMedio = kgPorSaco / 2;
+          nuevosGranel -= item.cantidad * kgMedio;
+          nota = `Venta medio (${kgMedio}kg) x${item.cantidad}`;
+        } else if (item.presentacion === 'arroba') {
+          const kgArroba = kgPorSaco * 11.5 / 40; // Proporción de arroba según peso de saco
+          nuevosGranel -= item.cantidad * kgArroba;
+          nota = `Venta arroba (${kgArroba.toFixed(1)}kg) x${item.cantidad}`;
+        } else if (item.presentacion === 'kilo') {
+          nuevosGranel -= item.cantidad;
+          nota = `Venta ${item.cantidad} kg`;
+        } else if (item.presentacion === 'importe') {
+          // Venta por importe: calcular kg según el monto
+          const kgDescontar = item.subtotal / p.pKilo;
+          nuevosGranel -= kgDescontar;
+          nota = `Venta por importe S/ ${item.subtotal.toFixed(2)} (${kgDescontar.toFixed(2)} kg)`;
+        }
+
         nuevosMovimientos.push({
           id: Date.now() + Math.random(),
           fecha: new Date().toISOString(),
@@ -110,6 +129,7 @@ export function AppProvider({ children }) {
           nota,
           usuario: currentUser?.nombre,
         });
+
         return { ...p, sacos: Math.max(0, nuevosSacos), granel: Math.max(0, nuevosGranel) };
       }));
     });
@@ -139,11 +159,12 @@ export function AppProvider({ children }) {
     }));
   };
 
-  const ingresarStock = (productoId, sacos, kg, nota) => {
+  const ingresarStock = (productoId, sacos, kg, nota, unidades = 0) => {
     setProducts(prev => prev.map(p => {
       if (p.id !== productoId) return p;
       const nuevosSacos = Math.max(0, p.sacos + sacos);
       const nuevosKg = Math.max(0, p.granel + kg);
+      const nuevasUnidades = Math.max(0, (p.unidades || 0) + unidades);
       const esApertura = sacos < 0;
       setKardex(k => [{
         id: Date.now(), fecha: new Date().toISOString(), producto: p.nombre, productoId,
@@ -152,7 +173,7 @@ export function AppProvider({ children }) {
         nota: nota || (esApertura ? 'Apertura de saco' : 'Ingreso de stock'),
         usuario: currentUser?.nombre
       }, ...k]);
-      return { ...p, sacos: nuevosSacos, granel: nuevosKg };
+      return { ...p, sacos: nuevosSacos, granel: nuevosKg, unidades: nuevasUnidades };
     }));
   };
 

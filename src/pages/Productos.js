@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, X, PackagePlus, Scissors } from 'lucide-react';
 
 const EMPTY = {
   nombre:'', categoria:'Aves', etapa:'', tipoVenta:'sacos',
+  kgPorSaco: 40,
   pSaco:0, pMedio:0, pArroba:0, pKilo:0, pUnidad:0,
   sacos:0, granel:0, unidades:0
 };
@@ -58,15 +59,20 @@ function ProductModal({ producto, onClose, onSave, todasCategorias }) {
 
           {(form.tipoVenta==='sacos'||!form.tipoVenta) ? (
             <>
+              <div className="form-group">
+                <label className="form-label">Kilogramos por saco</label>
+                <input className="form-input" type="number" step="0.1" value={form.kgPorSaco||40} onChange={e=>f('kgPorSaco',parseFloat(e.target.value)||40)} placeholder="40"/>
+                <div style={{fontSize:11,color:'var(--text-light)',marginTop:4}}>Ej: 40, 25, 50, etc.</div>
+              </div>
               <div style={{fontWeight:600,fontSize:13,color:'var(--text-mid)',margin:'12px 0 8px'}}>Precios (S/)</div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">Saco 40KG</label>
+                <div className="form-group"><label className="form-label">Saco ({form.kgPorSaco||40}KG)</label>
                   <input className="form-input" type="number" step="0.01" value={form.pSaco} onChange={e=>f('pSaco',parseFloat(e.target.value)||0)}/></div>
-                <div className="form-group"><label className="form-label">Medio 20KG</label>
+                <div className="form-group"><label className="form-label">Medio ({((form.kgPorSaco||40)/2).toFixed(1)}KG)</label>
                   <input className="form-input" type="number" step="0.01" value={form.pMedio} onChange={e=>f('pMedio',parseFloat(e.target.value)||0)}/></div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">Arroba 11.5KG</label>
+                <div className="form-group"><label className="form-label">Arroba ({((form.kgPorSaco||40)*11.5/40).toFixed(1)}KG)</label>
                   <input className="form-input" type="number" step="0.01" value={form.pArroba} onChange={e=>f('pArroba',parseFloat(e.target.value)||0)}/></div>
                 <div className="form-group"><label className="form-label">Kilo</label>
                   <input className="form-input" type="number" step="0.01" value={form.pKilo} onChange={e=>f('pKilo',parseFloat(e.target.value)||0)}/></div>
@@ -103,7 +109,7 @@ function ProductModal({ producto, onClose, onSave, todasCategorias }) {
 function StockModal({ producto, tipo, onClose, onSave }) {
   const [cantidad, setCantidad] = useState(0);
   const [nota, setNota] = useState('');
-  const kgPorSaco = 40;
+  const kgPorSaco = producto.kgPorSaco || 40;
   const esUnidad = producto.tipoVenta === 'unidad';
 
   const registrar = () => {
@@ -180,19 +186,20 @@ export default function Productos() {
         <table>
           <thead>
             <tr>
-              <th>Producto</th><th>Etapa / Desc.</th><th>Tipo venta</th>
+              <th>Producto</th><th>Etapa / Desc.</th><th>Tipo venta</th><th>Kg/Saco</th>
               <th>P. Saco</th><th>P. Medio</th><th>P. Arroba</th><th>P. Kilo / Unid.</th>
               <th>Stock</th><th className="text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0
-              ? <tr><td colSpan={9} className="text-center" style={{padding:32,color:'var(--text-light)'}}>No hay productos en esta categoría</td></tr>
+              ? <tr><td colSpan={10} className="text-center" style={{padding:32,color:'var(--text-light)'}}>No hay productos en esta categoría</td></tr>
               : filtered.map(p=>(
               <tr key={p.id}>
                 <td><strong>{p.nombre}</strong></td>
                 <td>{p.etapa ? <span className="badge badge-green">{p.etapa}</span> : <span style={{color:'var(--text-light)'}}>—</span>}</td>
                 <td><span className={`badge ${p.tipoVenta==='unidad'?'badge-orange':'badge-gray'}`}>{p.tipoVenta==='unidad'?'Unidad':'Sacos/kg'}</span></td>
+                <td>{p.tipoVenta==='unidad' ? <span style={{color:'var(--text-light)'}}>—</span> : <strong>{p.kgPorSaco||40} kg</strong>}</td>
                 {p.tipoVenta==='unidad' ? (
                   <><td colSpan={3} style={{color:'var(--text-light)'}}>—</td><td style={{fontWeight:600}}>S/ {(p.pUnidad||0).toFixed(2)}</td></>
                 ) : (

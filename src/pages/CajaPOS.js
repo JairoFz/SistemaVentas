@@ -4,21 +4,28 @@ import { Search, ShoppingCart, X, Plus, Minus, Printer, Pencil } from 'lucide-re
 
 function imprimirBoleta(venta) {
   const win = window.open('', '_blank', 'width=420,height=650');
-  const items = venta.items.map(item => `
+  const items = venta.items.map(item => {
+    let descripcion = '';
+    const kgPorSaco = item.kgPorSaco || 40;
+    
+    if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
+    else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
+    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(kgPorSaco*11.5/40).toFixed(1)}kg`;
+    else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
+    else if (item.presentacion === 'importe') descripcion = `Por importe`;
+    else descripcion = 'Unidad';
+
+    return `
     <tr>
       <td>
         <div style="font-weight:500">${item.nombre}</div>
-        <div style="font-size:10px;color:#999;text-transform:capitalize">
-          ${item.presentacion !== 'unidad'
-            ? item.presentacion + ' ' + (item.presentacion==='saco'?'40kg':item.presentacion==='medio'?'20kg':item.presentacion==='arroba'?'11.5kg':'')
-            : 'Unidad'}
-        </div>
+        <div style="font-size:10px;color:#999;text-transform:capitalize">${descripcion}</div>
       </td>
-      <td style="text-align:center">${item.cantidad}</td>
-      <td>S/ ${item.precioUnitario.toFixed(2)}</td>
+      <td style="text-align:center">${item.presentacion === 'importe' ? '—' : item.cantidad}</td>
+      <td>${item.presentacion === 'importe' ? '—' : 'S/ ' + item.precioUnitario.toFixed(2)}</td>
       <td style="font-weight:600;text-align:right">S/ ${item.subtotal.toFixed(2)}</td>
     </tr>
-  `).join('');
+  `}).join('');
 
   win.document.write(`<!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8"/>
@@ -98,19 +105,28 @@ function BoletaModal({ venta, onClose }) {
               <tr><th>Item</th><th>Cant</th><th>P.U.</th><th>Total</th></tr>
             </thead>
             <tbody>
-              {venta.items.map((item,i) => (
-                <tr key={i}>
-                  <td>
-                    <div style={{fontWeight:500}}>{item.nombre}</div>
-                    <div style={{fontSize:10,color:'#999',textTransform:'capitalize'}}>
-                      {item.presentacion !== 'unidad' ? `${item.presentacion} ${item.presentacion==='saco'?'40kg':item.presentacion==='medio'?'20kg':item.presentacion==='arroba'?'11.5kg':''}` : 'Unidad'}
-                    </div>
-                  </td>
-                  <td style={{textAlign:'center'}}>{item.cantidad}</td>
-                  <td>S/ {item.precioUnitario.toFixed(2)}</td>
-                  <td style={{fontWeight:600}}>S/ {item.subtotal.toFixed(2)}</td>
-                </tr>
-              ))}
+              {venta.items.map((item,i) => {
+                let descripcion = '';
+                const kgPorSaco = item.kgPorSaco || 40;
+                if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
+                else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
+                else if (item.presentacion === 'arroba') descripcion = `Arroba ${(kgPorSaco*11.5/40).toFixed(1)}kg`;
+                else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
+                else if (item.presentacion === 'importe') descripcion = `Por importe`;
+                else descripcion = 'Unidad';
+
+                return (
+                  <tr key={i}>
+                    <td>
+                      <div style={{fontWeight:500}}>{item.nombre}</div>
+                      <div style={{fontSize:10,color:'#999',textTransform:'capitalize'}}>{descripcion}</div>
+                    </td>
+                    <td style={{textAlign:'center'}}>{item.presentacion === 'importe' ? '—' : item.cantidad}</td>
+                    <td>{item.presentacion === 'importe' ? '—' : `S/ ${item.precioUnitario.toFixed(2)}`}</td>
+                    <td style={{fontWeight:600}}>S/ {item.subtotal.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div className="boleta-total">
@@ -130,6 +146,58 @@ function BoletaModal({ venta, onClose }) {
   );
 }
 
+function ImporteModal({ producto, onClose, onAdd }) {
+  const [monto, setMonto] = useState('');
+
+  const agregar = () => {
+    const m = parseFloat(monto);
+    if (!m || m <= 0) return;
+    onAdd(producto, 'importe', m);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Venta por importe</h2>
+          <button style={{background:'none',border:'none',cursor:'pointer'}} onClick={onClose}><X size={18}/></button>
+        </div>
+        <div className="modal-body">
+          <div style={{background:'var(--green-light)',padding:'10px 14px',borderRadius:8,marginBottom:16,fontSize:13}}>
+            <strong>{producto.nombre}</strong>
+            <div style={{color:'var(--text-light)',fontSize:11,marginTop:4}}>
+              Precio por kilo: S/ {producto.pKilo.toFixed(2)}
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Monto a vender (S/)</label>
+            <input
+              className="form-input"
+              type="number"
+              step="0.50"
+              min="0.50"
+              value={monto}
+              onChange={e=>setMonto(e.target.value)}
+              placeholder="10.00"
+              autoFocus
+            />
+            {parseFloat(monto) > 0 && (
+              <div style={{marginTop:8,fontSize:12,color:'var(--text-light)'}}>
+                Equivale a <strong>{(parseFloat(monto) / producto.pKilo).toFixed(2)} kg</strong>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={agregar}>Agregar al carrito</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CajaPOS() {
   const { products, clients, cajaAbierta, abrirCaja, registrarVenta, currentUser } = useApp();
   const todasCategorias = [...new Set(products.map(p=>p.categoria))];
@@ -142,7 +210,8 @@ export default function CajaPOS() {
   const [boletaVenta, setBoletaVenta] = useState(null);
   const [montoApertura, setMontoApertura] = useState('');
   const [showApertura, setShowApertura] = useState(false);
-  const [editandoPrecio, setEditandoPrecio] = useState(null); // key del item editando
+  const [editandoPrecio, setEditandoPrecio] = useState(null);
+  const [modalImporte, setModalImporte] = useState(null);
 
   const cats = [...new Set(products.map(p=>p.categoria))];
   const filtered = products.filter(p =>
@@ -152,19 +221,21 @@ export default function CajaPOS() {
   );
 
   const addItem = (producto, presentacion, precio) => {
-    const key = `${producto.id}-${presentacion}`;
-    setCarrito(prev => {
-      const ex = prev.find(x => x.key === key);
-      if (ex) return prev.map(x => x.key === key
-        ? {...x, cantidad: x.cantidad+1, subtotal:(x.cantidad+1)*x.precioUnitario}
-        : x);
-      return [...prev, {
-        key, productoId: producto.id, nombre: producto.nombre,
-        presentacion, precioUnitario: precio, precioOriginal: precio,
-        cantidad: 1, subtotal: precio,
-        tipoVenta: producto.tipoVenta || 'sacos',
-      }];
-    });
+    const key = `${producto.id}-${presentacion}-${Date.now()}`;
+    const kgPorSaco = producto.kgPorSaco || 40;
+    
+    setCarrito(prev => [...prev, {
+      key,
+      productoId: producto.id,
+      nombre: producto.nombre,
+      presentacion,
+      precioUnitario: presentacion === 'importe' ? 1 : precio,
+      precioOriginal: presentacion === 'importe' ? 1 : precio,
+      cantidad: presentacion === 'importe' ? precio : 1,
+      subtotal: precio,
+      tipoVenta: producto.tipoVenta || 'sacos',
+      kgPorSaco,
+    }]);
   };
 
   const updateQty = (key, delta) => {
@@ -183,7 +254,6 @@ export default function CajaPOS() {
     ));
   };
 
-  // Delta según presentación: arroba y kilo permiten 0.5, el resto 1
   const getDelta = (presentacion) =>
     (presentacion === 'arroba' || presentacion === 'kilo') ? 0.5 : 1;
 
@@ -258,7 +328,6 @@ export default function CajaPOS() {
       </div>
       <div className="pos-layout">
         <div className="pos-products">
-          {/* Tabs de categorías dinámicas */}
           <div className="category-tabs">
             {cats.map(cat => (
               <button key={cat} className={`tab-btn ${categoria===cat?'active':''}`} onClick={()=>setCategoria(cat)}>{cat}</button>
@@ -269,45 +338,57 @@ export default function CajaPOS() {
             <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar producto..." />
           </div>
           <div className="products-grid">
-            {filtered.map(p => (
-              <div key={p.id} className="product-card">
-                <h3>{p.nombre}</h3>
-                <div className="etapa">{p.etapa || p.categoria}</div>
-                {p.tipoVenta === 'unidad' ? (
-                  <>
-                    <div className="stock-info">{p.unidades||0} unidades en stock</div>
-                    <div className="price-grid" style={{gridTemplateColumns:'1fr'}}>
-                      <button className="price-btn" onClick={()=>addItem(p,'unidad',p.pUnidad||0)}>
-                        <div className="pres">Por unidad</div>
-                        <div className="precio">S/ {(p.pUnidad||0).toFixed(2)}</div>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="stock-info">{p.sacos} sacos · {p.granel.toFixed(1)} kg granel</div>
-                    <div className="price-grid">
-                      <button className="price-btn" onClick={()=>addItem(p,'saco',p.pSaco)}>
-                        <div className="pres">Saco 40KG</div>
-                        <div className="precio">S/ {p.pSaco.toFixed(2)}</div>
-                      </button>
-                      <button className="price-btn" onClick={()=>addItem(p,'medio',p.pMedio)}>
-                        <div className="pres">Medio 20KG</div>
-                        <div className="precio">S/ {p.pMedio.toFixed(2)}</div>
-                      </button>
-                      <button className="price-btn" onClick={()=>addItem(p,'arroba',p.pArroba)}>
-                        <div className="pres">Arroba 11.5KG</div>
-                        <div className="precio">S/ {p.pArroba.toFixed(2)}</div>
-                      </button>
-                      <button className="price-btn" onClick={()=>addItem(p,'kilo',p.pKilo)}>
-                        <div className="pres">Kilo</div>
-                        <div className="precio">S/ {p.pKilo.toFixed(2)}</div>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+            {filtered.map(p => {
+              const kgPorSaco = p.kgPorSaco || 40;
+              const kgMedio = kgPorSaco / 2;
+              const kgArroba = kgPorSaco * 11.5 / 40;
+
+              return (
+                <div key={p.id} className="product-card">
+                  <h3>{p.nombre}</h3>
+                  <div className="etapa">{p.etapa || p.categoria}</div>
+                  {p.tipoVenta === 'unidad' ? (
+                    <>
+                      <div className="stock-info">{p.unidades||0} unidades en stock</div>
+                      <div className="price-grid" style={{gridTemplateColumns:'1fr'}}>
+                        <button className="price-btn" onClick={()=>addItem(p,'unidad',p.pUnidad||0)}>
+                          <div className="pres">Por unidad</div>
+                          <div className="precio">S/ {(p.pUnidad||0).toFixed(2)}</div>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="stock-info">{p.sacos} sacos · {p.granel.toFixed(1)} kg granel</div>
+                      <div className="price-grid">
+                        <button className="price-btn" onClick={()=>addItem(p,'saco',p.pSaco)}>
+                          <div className="pres">Saco {kgPorSaco}KG</div>
+                          <div className="precio">S/ {p.pSaco.toFixed(2)}</div>
+                        </button>
+                        <button className="price-btn" onClick={()=>addItem(p,'medio',p.pMedio)}>
+                          <div className="pres">Medio {kgMedio.toFixed(1)}KG</div>
+                          <div className="precio">S/ {p.pMedio.toFixed(2)}</div>
+                        </button>
+                        <button className="price-btn" onClick={()=>addItem(p,'arroba',p.pArroba)}>
+                          <div className="pres">Arroba {kgArroba.toFixed(1)}KG</div>
+                          <div className="precio">S/ {p.pArroba.toFixed(2)}</div>
+                        </button>
+                        <button className="price-btn" onClick={()=>addItem(p,'kilo',p.pKilo)}>
+                          <div className="pres">Kilo</div>
+                          <div className="precio">S/ {p.pKilo.toFixed(2)}</div>
+                        </button>
+                        <button className="price-btn" style={{background:'linear-gradient(135deg, #10b981 0%, #059669 100%)',color:'white'}} onClick={()=>setModalImporte(p)}>
+                          <div className="pres">
+                           <span style={{fontWeight:700,marginRight:4}}>S/</span>Por importe
+                          </div>
+                           <div className="precio" style={{fontSize:11}}>Ingresa monto</div>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -321,65 +402,82 @@ export default function CajaPOS() {
             <div className="cart-items">
               {carrito.length === 0
                 ? <div className="cart-empty">Selecciona productos para empezar</div>
-                : carrito.map(item => (
-                  <div key={item.key} className="cart-item" style={{flexDirection:'column',alignItems:'stretch',gap:6}}>
-                    <div style={{display:'flex',alignItems:'center',gap:6}}>
-                      <div className="cart-item-info" style={{flex:1}}>
-                        <div className="cart-item-name">{item.nombre}</div>
-                        <div className="cart-item-sub" style={{textTransform:'capitalize'}}>
-                          {item.presentacion}
-                          {item.presentacion==='arroba' && ' (11.5kg)'}
-                          {item.presentacion==='kilo' && ' (kg)'}
+                : carrito.map(item => {
+                    const kgPorSaco = item.kgPorSaco || 40;
+                    let descripcion = '';
+                    if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
+                    else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
+                    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(kgPorSaco*11.5/40).toFixed(1)}kg`;
+                    else if (item.presentacion === 'kilo') descripcion = 'Kilo';
+                    else if (item.presentacion === 'importe') descripcion = 'Por importe';
+                    else descripcion = 'Unidad';
+
+                    return (
+                      <div key={item.key} className="cart-item" style={{flexDirection:'column',alignItems:'stretch',gap:6}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <div className="cart-item-info" style={{flex:1}}>
+                            <div className="cart-item-name">{item.nombre}</div>
+                            <div className="cart-item-sub" style={{textTransform:'capitalize'}}>{descripcion}</div>
+                          </div>
+                          {item.presentacion !== 'importe' && (
+                            <div className="cart-qty">
+                              <button className="qty-btn" onClick={()=>updateQty(item.key, -getDelta(item.presentacion))}><Minus size={10}/></button>
+                              <input
+                                type="number"
+                                step={getDelta(item.presentacion)}
+                                min="0.5"
+                                value={item.cantidad}
+                                onChange={e => updateCantidad(item.key, e.target.value)}
+                                style={{width:44, textAlign:'center', border:'1px solid var(--border)', borderRadius:4, padding:'2px 4px', fontSize:13, fontWeight:600, fontFamily:'DM Sans, sans-serif'}}
+                              />
+                              <button className="qty-btn" onClick={()=>updateQty(item.key, getDelta(item.presentacion))}><Plus size={10}/></button>
+                            </div>
+                          )}
+                          <button className="cart-remove" onClick={()=>removeItem(item.key)}><X size={14}/></button>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--bg)',borderRadius:6,padding:'4px 8px'}}>
+                          {item.presentacion === 'importe' ? (
+                            <>
+                              <span style={{fontSize:11,color:'var(--text-light)',flex:1}}>Importe</span>
+                              <span style={{fontSize:13,fontWeight:700,color:'var(--green)'}}>S/ {item.subtotal.toFixed(2)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{fontSize:11,color:'var(--text-light)',flex:1}}>P.U.</span>
+                              {editandoPrecio === item.key ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  defaultValue={item.precioUnitario}
+                                  style={{width:70,border:'1px solid var(--green)',borderRadius:4,padding:'2px 6px',fontSize:13,fontWeight:600,textAlign:'right'}}
+                                  autoFocus
+                                  onBlur={e=>{updatePrecio(item.key, e.target.value); setEditandoPrecio(null);}}
+                                  onKeyDown={e=>{ if(e.key==='Enter'){updatePrecio(item.key,e.target.value);setEditandoPrecio(null);}}}
+                                />
+                              ) : (
+                                <span
+                                  style={{fontSize:13,fontWeight:600,cursor:'pointer',borderBottom:'1px dashed var(--text-light)',paddingBottom:1}}
+                                  onClick={()=>setEditandoPrecio(item.key)}
+                                  title="Clic para editar precio"
+                                >
+                                  S/ {item.precioUnitario.toFixed(2)}
+                                </span>
+                              )}
+                              <button
+                                style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-light)',padding:2}}
+                                title="Editar precio"
+                                onClick={()=>setEditandoPrecio(editandoPrecio===item.key?null:item.key)}
+                              ><Pencil size={12}/></button>
+                              {item.precioUnitario !== item.precioOriginal && (
+                                <span style={{fontSize:10,color:'var(--orange)',fontWeight:600}}>mod.</span>
+                              )}
+                              <span style={{fontSize:13,fontWeight:700,color:'var(--green)',marginLeft:4}}>= S/ {item.subtotal.toFixed(2)}</span>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="cart-qty">
-                        <button className="qty-btn" onClick={()=>updateQty(item.key, -getDelta(item.presentacion))}><Minus size={10}/></button>
-                        <input
-                          type="number"
-                          step={getDelta(item.presentacion)}
-                          min="0.5"
-                          value={item.cantidad}
-                          onChange={e => updateCantidad(item.key, e.target.value)}
-                          style={{width:44, textAlign:'center', border:'1px solid var(--border)', borderRadius:4, padding:'2px 4px', fontSize:13, fontWeight:600, fontFamily:'DM Sans, sans-serif'}}
-                        />
-                        <button className="qty-btn" onClick={()=>updateQty(item.key, getDelta(item.presentacion))}><Plus size={10}/></button>
-                      </div>
-                      <button className="cart-remove" onClick={()=>removeItem(item.key)}><X size={14}/></button>
-                    </div>
-                    {/* Precio editable */}
-                    <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--bg)',borderRadius:6,padding:'4px 8px'}}>
-                      <span style={{fontSize:11,color:'var(--text-light)',flex:1}}>P.U.</span>
-                      {editandoPrecio === item.key ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          defaultValue={item.precioUnitario}
-                          style={{width:70,border:'1px solid var(--green)',borderRadius:4,padding:'2px 6px',fontSize:13,fontWeight:600,textAlign:'right'}}
-                          autoFocus
-                          onBlur={e=>{updatePrecio(item.key, e.target.value); setEditandoPrecio(null);}}
-                          onKeyDown={e=>{ if(e.key==='Enter'){updatePrecio(item.key,e.target.value);setEditandoPrecio(null);}}}
-                        />
-                      ) : (
-                        <span
-                          style={{fontSize:13,fontWeight:600,cursor:'pointer',borderBottom:'1px dashed var(--text-light)',paddingBottom:1}}
-                          onClick={()=>setEditandoPrecio(item.key)}
-                          title="Clic para editar precio"
-                        >
-                          S/ {item.precioUnitario.toFixed(2)}
-                        </span>
-                      )}
-                      <button
-                        style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-light)',padding:2}}
-                        title="Editar precio"
-                        onClick={()=>setEditandoPrecio(editandoPrecio===item.key?null:item.key)}
-                      ><Pencil size={12}/></button>
-                      {item.precioUnitario !== item.precioOriginal && (
-                        <span style={{fontSize:10,color:'var(--orange)',fontWeight:600}}>mod.</span>
-                      )}
-                      <span style={{fontSize:13,fontWeight:700,color:'var(--green)',marginLeft:4}}>= S/ {item.subtotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))
+                    );
+                  })
               }
             </div>
             <div className="cart-footer">
@@ -418,6 +516,7 @@ export default function CajaPOS() {
       </div>
 
       {boletaVenta && <BoletaModal venta={boletaVenta} onClose={()=>setBoletaVenta(null)} />}
+      {modalImporte && <ImporteModal producto={modalImporte} onClose={()=>setModalImporte(null)} onAdd={addItem} />}
     </div>
   );
 }
