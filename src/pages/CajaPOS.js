@@ -10,7 +10,7 @@ function imprimirBoleta(venta) {
     
     if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
     else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
-    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(kgPorSaco*11.5/40).toFixed(1)}kg`;
+    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(11.5)}kg`;
     else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
     else if (item.presentacion === 'importe') descripcion = `Por importe`;
     else descripcion = 'Unidad';
@@ -110,7 +110,7 @@ function BoletaModal({ venta, onClose }) {
                 const kgPorSaco = item.kgPorSaco || 40;
                 if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
                 else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
-                else if (item.presentacion === 'arroba') descripcion = `Arroba ${(kgPorSaco*11.5/40).toFixed(1)}kg`;
+                else if (item.presentacion === 'arroba') descripcion = `Arroba ${(11.5)}kg`;
                 else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
                 else if (item.presentacion === 'importe') descripcion = `Por importe`;
                 else descripcion = 'Unidad';
@@ -341,7 +341,7 @@ export default function CajaPOS() {
             {filtered.map(p => {
               const kgPorSaco = p.kgPorSaco || 40;
               const kgMedio = kgPorSaco / 2;
-              const kgArroba = kgPorSaco * 11.5 / 40;
+              const kgArroba = 11.5;
 
               return (
                 <div key={p.id} className="product-card">
@@ -407,7 +407,7 @@ export default function CajaPOS() {
                     let descripcion = '';
                     if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
                     else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
-                    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(kgPorSaco*11.5/40).toFixed(1)}kg`;
+                    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(11.5).toFixed(1)}kg`;
                     else if (item.presentacion === 'kilo') descripcion = 'Kilo';
                     else if (item.presentacion === 'importe') descripcion = 'Por importe';
                     else descripcion = 'Unidad';

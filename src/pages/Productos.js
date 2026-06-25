@@ -72,7 +72,7 @@ function ProductModal({ producto, onClose, onSave, todasCategorias }) {
                   <input className="form-input" type="number" step="0.01" value={form.pMedio} onChange={e=>f('pMedio',parseFloat(e.target.value)||0)}/></div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">Arroba ({((form.kgPorSaco||40)*11.5/40).toFixed(1)}KG)</label>
+                <div className="form-group"><label className="form-label">Arroba (11.5KG)</label>
                   <input className="form-input" type="number" step="0.01" value={form.pArroba} onChange={e=>f('pArroba',parseFloat(e.target.value)||0)}/></div>
                 <div className="form-group"><label className="form-label">Kilo</label>
                   <input className="form-input" type="number" step="0.01" value={form.pKilo} onChange={e=>f('pKilo',parseFloat(e.target.value)||0)}/></div>

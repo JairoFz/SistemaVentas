@@ -127,7 +127,7 @@ export function AppProvider({ children }) {
           nuevosGranel -= item.cantidad * kgMedio;
           nota = `Venta medio (${kgMedio}kg) x${item.cantidad}`;
         } else if (item.presentacion === 'arroba') {
-          const kgArroba = (kgPorSaco * 11.5) / 40;
+          const kgArroba = 11.5;
           nuevosGranel -= item.cantidad * kgArroba;
           nota = `Venta arroba (${kgArroba.toFixed(1)}kg) x${item.cantidad}`;
         } else if (item.presentacion === 'kilo') {
