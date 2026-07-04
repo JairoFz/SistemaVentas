@@ -1,83 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Search, ShoppingCart, X, Plus, Minus, Printer, Pencil } from 'lucide-react';
-
-function imprimirBoleta(venta) {
-  const win = window.open('', '_blank', 'width=420,height=650');
-  const items = venta.items.map(item => {
-    let descripcion = '';
-    const kgPorSaco = item.kgPorSaco || 40;
-    
-    if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
-    else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
-    else if (item.presentacion === 'arroba') descripcion = `Arroba ${(11.5)}kg`;
-    else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
-    else if (item.presentacion === 'importe') descripcion = `Por importe`;
-    else descripcion = 'Unidad';
-
-    return `
-    <tr>
-      <td>
-        <div style="font-weight:500">${item.nombre}</div>
-        <div style="font-size:10px;color:#999;text-transform:capitalize">${descripcion}</div>
-      </td>
-      <td style="text-align:center">${item.presentacion === 'importe' ? '—' : item.cantidad}</td>
-      <td>${item.presentacion === 'importe' ? '—' : 'S/ ' + item.precioUnitario.toFixed(2)}</td>
-      <td style="font-weight:600;text-align:right">S/ ${item.subtotal.toFixed(2)}</td>
-    </tr>
-  `}).join('');
-
-  win.document.write(`<!DOCTYPE html><html lang="es"><head>
-    <meta charset="UTF-8"/>
-    <title>${venta.codigo}</title>
-    <style>
-      * { margin:0; padding:0; box-sizing:border-box; }
-      body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; width: 300px; margin: 0 auto; }
-      .header { text-align:center; padding-bottom: 10px; border-bottom: 1px dashed #ccc; margin-bottom: 10px; }
-      .header .logo { font-size: 26px; }
-      .header h2 { font-size: 15px; font-weight: 700; margin: 4px 0 2px; }
-      .header p { font-size: 10px; color: #666; }
-      .tipo { font-weight: 700; font-size: 13px; margin-top: 8px; }
-      .codigo { font-size: 12px; margin-top: 2px; }
-      .fecha { font-size: 10px; color: #999; margin-top: 2px; }
-      .info { font-size: 11px; margin: 10px 0; line-height: 1.9; border-bottom: 1px dashed #ccc; padding-bottom: 10px; }
-      table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
-      th { text-align: left; border-bottom: 1px solid #333; padding: 4px 2px; font-size: 10px; font-weight: 700; }
-      td { padding: 5px 2px; border-bottom: 1px dotted #eee; vertical-align: top; }
-      .total-row td { border-top: 2px solid #000; border-bottom: none; font-weight: 700; font-size: 14px; padding-top: 8px; }
-      .gracias { text-align: center; font-size: 11px; color: #666; margin-top: 14px; padding-top: 10px; border-top: 1px dashed #ccc; }
-      @media print { body { padding: 0; } }
-    </style>
-  </head><body>
-    <div class="header">
-      <div class="logo">🌾</div>
-      <h2>FERCORD</h2>
-      <p>Nutrición Balanceada · Aves y Cerdos</p>
-      <hr style="border:none;border-top:1px dashed #ccc;margin:8px 0 6px"/>
-      <div class="tipo">${venta.tipo === 'factura' ? 'FACTURA DE VENTA' : 'BOLETA DE VENTA'}</div>
-      <div class="codigo">${venta.codigo}</div>
-      <div class="fecha">${new Date(venta.fecha).toLocaleString('es-PE')}</div>
-    </div>
-    <div class="info">
-      <strong>Cliente:</strong> ${venta.clienteNombre}<br/>
-      <strong>Vendedor:</strong> ${venta.vendedor}<br/>
-      <strong>Pago:</strong> ${venta.metodoPago}
-    </div>
-    <table>
-      <thead><tr><th>Item</th><th>Cant</th><th>P.U.</th><th style="text-align:right">Total</th></tr></thead>
-      <tbody>${items}</tbody>
-      <tfoot>
-        <tr class="total-row">
-          <td colspan="3">TOTAL</td>
-          <td style="text-align:right">S/ ${venta.total.toFixed(2)}</td>
-        </tr>
-      </tfoot>
-    </table>
-    <div class="gracias">¡Gracias por su compra!</div>
-    <script>window.onload = () => { window.print(); }<\/script>
-  </body></html>`);
-  win.document.close();
-}
+import { imprimirBoleta } from '../utils/imprimirBoleta';
 
 function BoletaModal({ venta, onClose }) {
   return (
@@ -220,10 +144,88 @@ export default function CajaPOS() {
      (p.etapa||'').toLowerCase().includes(busqueda.toLowerCase()))
   );
 
+  const getDelta = (presentacion) =>
+    (presentacion === 'arroba' || presentacion === 'kilo') ? 0.5 : 1;
+
+  // Convierte una presentación + cantidad a kg de granel equivalente
+  const kgDeItem = (p, presentacion, cantidad, kgPorSaco) => {
+    if (presentacion === 'medio') return (kgPorSaco/2) * cantidad;
+    if (presentacion === 'arroba') return 11.5 * cantidad;
+    if (presentacion === 'kilo') return 1 * cantidad;
+    if (presentacion === 'importe') return (p.pKilo > 0 ? cantidad / p.pKilo : 0); // cantidad = monto en este caso
+    return 0;
+  };
+
+  // Calcula cuánto stock queda disponible, descontando lo que ya está en el carrito
+  // (excluye el propio item si se pasa excludeKey, para recalcular su propio máximo)
+  const stockDisponible = (productoId, presentacion, kgPorSaco, excludeKey = null) => {
+    const p = products.find(x => x.id === productoId);
+    if (!p) return Infinity;
+
+    if (presentacion === 'unidad') {
+      const usados = carrito.filter(x => x.productoId === productoId && x.presentacion === 'unidad' && x.key !== excludeKey)
+        .reduce((s,x) => s + x.cantidad, 0);
+      return (p.unidades || 0) - usados;
+    }
+    if (presentacion === 'saco') {
+      const usados = carrito.filter(x => x.productoId === productoId && x.presentacion === 'saco' && x.key !== excludeKey)
+        .reduce((s,x) => s + x.cantidad, 0);
+      return (p.sacos || 0) - usados;
+    }
+
+    // medio, arroba, kilo e importe -> todos consumen granel
+    const usadosKg = carrito
+      .filter(x => x.productoId === productoId && ['medio','arroba','kilo','importe'].includes(x.presentacion) && x.key !== excludeKey)
+      .reduce((s,x) => s + kgDeItem(p, x.presentacion, x.cantidad, kgPorSaco), 0);
+
+    const granelRestante = (p.granel || 0) - usadosKg;
+
+    if (presentacion === 'importe') return granelRestante;
+    const kgNecesarioPorUnidad = kgDeItem(p, presentacion, 1, kgPorSaco);
+    return granelRestante / kgNecesarioPorUnidad;
+  };
+
   const addItem = (producto, presentacion, precio) => {
-    const key = `${producto.id}-${presentacion}-${Date.now()}`;
     const kgPorSaco = producto.kgPorSaco || 40;
-    
+
+    // "importe" siempre se agrega como item nuevo (cada monto es distinto)
+    const existente = presentacion !== 'importe'
+      ? carrito.find(x => x.productoId === producto.id && x.presentacion === presentacion)
+      : null;
+
+    if (existente) {
+      // Ya hay un item igual: solo le sumamos, no se crea otro
+      const delta = getDelta(presentacion);
+      const max = stockDisponible(producto.id, presentacion, kgPorSaco, existente.key) + existente.cantidad;
+      const nueva = Math.min(max, existente.cantidad + delta);
+      if (nueva <= existente.cantidad) {
+        alert(`Sin stock suficiente de "${producto.nombre}" para esta presentación.`);
+        return;
+      }
+      setCarrito(prev => prev.map(x => x.key === existente.key
+        ? { ...x, cantidad: nueva, subtotal: nueva * x.precioUnitario }
+        : x
+      ));
+      return;
+    }
+
+    // Item nuevo
+    if (presentacion === 'importe') {
+      const kgNecesario = producto.pKilo > 0 ? precio / producto.pKilo : 0;
+      const granelDisponible = stockDisponible(producto.id, 'importe', kgPorSaco);
+      if (granelDisponible < kgNecesario) {
+        alert(`Granel insuficiente de "${producto.nombre}" para ese importe.`);
+        return;
+      }
+    } else {
+      const disponible = stockDisponible(producto.id, presentacion, kgPorSaco);
+      if (disponible < 1) {
+        alert(`Sin stock suficiente de "${producto.nombre}" para esta presentación.`);
+        return;
+      }
+    }
+
+    const key = `${producto.id}-${presentacion}-${Date.now()}`;
     setCarrito(prev => [...prev, {
       key,
       productoId: producto.id,
@@ -241,7 +243,8 @@ export default function CajaPOS() {
   const updateQty = (key, delta) => {
     setCarrito(prev => prev.map(x => {
       if (x.key !== key) return x;
-      const nueva = Math.max(0.5, parseFloat((x.cantidad + delta).toFixed(2)));
+      const max = stockDisponible(x.productoId, x.presentacion, x.kgPorSaco, x.key) + x.cantidad;
+      const nueva = Math.min(max, Math.max(0.5, parseFloat((x.cantidad + delta).toFixed(2))));
       return {...x, cantidad: nueva, subtotal: nueva * x.precioUnitario};
     }));
   };
@@ -249,13 +252,13 @@ export default function CajaPOS() {
   const updateCantidad = (key, valor) => {
     const nueva = parseFloat(valor) || 0;
     if (nueva <= 0) return;
-    setCarrito(prev => prev.map(x =>
-      x.key === key ? {...x, cantidad: nueva, subtotal: nueva * x.precioUnitario} : x
-    ));
+    setCarrito(prev => prev.map(x => {
+      if (x.key !== key) return x;
+      const max = stockDisponible(x.productoId, x.presentacion, x.kgPorSaco, x.key) + x.cantidad;
+      const cant = Math.min(nueva, max);
+      return {...x, cantidad: cant, subtotal: cant * x.precioUnitario};
+    }));
   };
-
-  const getDelta = (presentacion) =>
-    (presentacion === 'arroba' || presentacion === 'kilo') ? 0.5 : 1;
 
   const updatePrecio = (key, nuevoPrecio) => {
     const p = parseFloat(nuevoPrecio) || 0;

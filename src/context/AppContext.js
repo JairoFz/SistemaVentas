@@ -38,6 +38,7 @@ export function AppProvider({ children }) {
   const [cajaAbierta, setCajaAbierta] = useState(() => load('fercord_caja', null));
   const [movimientosCaja, setMovimientosCaja] = useState(() => load('fercord_movimientos', []));
   const [historialCajas, setHistorialCajas] = useState(() => load('fercord_historial_cajas', []));
+  const [correlativos, setCorrelativos] = useState(() => load('fercord_correlativos', { boleta: 0, factura: 0 }));
 
   useEffect(() => { save('fercord_products', products); }, [products]);
   useEffect(() => { save('fercord_clients', clients); }, [clients]);
@@ -47,6 +48,7 @@ export function AppProvider({ children }) {
   useEffect(() => { save('fercord_caja', cajaAbierta); }, [cajaAbierta]);
   useEffect(() => { save('fercord_movimientos', movimientosCaja); }, [movimientosCaja]);
   useEffect(() => { save('fercord_historial_cajas', historialCajas); }, [historialCajas]);
+  useEffect(() => { save('fercord_correlativos', correlativos); }, [correlativos]);
 
   const login = (email, password) => {
     const u = users.find(u => u.email === email && u.password === password);
@@ -66,7 +68,6 @@ export function AppProvider({ children }) {
   const addUser = (u) => setUsers(prev => [...prev, { ...u, id: Date.now() }]);
   const deleteUser = (id) => setUsers(prev => prev.filter(x => x.id !== id));
 
-  // Actualizar usuario (nombre, email) — también actualiza currentUser si es el mismo
   const updateUser = (u) => {
     setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...u } : x));
     if (currentUser?.id === u.id) {
@@ -76,7 +77,6 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Cambiar contraseña — verifica la actual antes
   const changePassword = (userId, actual, nueva) => {
     const user = users.find(u => u.id === userId);
     if (!user || user.password !== actual) return false;
@@ -85,9 +85,13 @@ export function AppProvider({ children }) {
   };
 
   const registrarVenta = (venta) => {
-    const codigo = venta.tipo === 'factura'
-      ? `F001-${String(ventas.filter(v => v.tipo === 'factura').length + 1).padStart(6, '0')}`
-      : `B001-${String(ventas.filter(v => v.tipo !== 'factura').length + 1).padStart(6, '0')}`;
+    const tipoKey = venta.tipo === 'factura' ? 'factura' : 'boleta';
+    const siguiente = (correlativos[tipoKey] || 0) + 1;
+    const codigo = tipoKey === 'factura'
+      ? `F001-${String(siguiente).padStart(6, '0')}`
+      : `B001-${String(siguiente).padStart(6, '0')}`;
+    setCorrelativos(prev => ({ ...prev, [tipoKey]: siguiente }));
+
     const nuevaVenta = { ...venta, id: Date.now(), codigo, fecha: new Date().toISOString() };
     setVentas(prev => [nuevaVenta, ...prev]);
 
@@ -118,7 +122,7 @@ export function AppProvider({ children }) {
           return { ...p, unidades: nuevasUnidades };
         }
 
-        // ── Productos por SACOS / GRANEL ──
+        // ── Productos por SACOS / GRANEL / IMPORTE ──
         if (item.presentacion === 'saco') {
           nuevosSacos -= item.cantidad;
           nota = `Venta saco x${item.cantidad}`;
@@ -133,6 +137,10 @@ export function AppProvider({ children }) {
         } else if (item.presentacion === 'kilo') {
           nuevosGranel -= item.cantidad;
           nota = `Venta ${item.cantidad} kg`;
+        } else if (item.presentacion === 'importe') {
+          const kgEquivalente = p.pKilo > 0 ? item.subtotal / p.pKilo : 0;
+          nuevosGranel -= kgEquivalente;
+          nota = `Venta por importe S/ ${item.subtotal.toFixed(2)} (${kgEquivalente.toFixed(2)}kg)`;
         }
 
         nuevosSacos = Math.max(0, nuevosSacos);
@@ -154,7 +162,6 @@ export function AppProvider({ children }) {
 
     setKardex(prev => [...nuevosMovimientos.reverse(), ...prev]);
 
-    // Registrar ingreso en caja (todos los métodos de pago)
     if (cajaAbierta) {
       const mov = {
         id: Date.now(), tipo: 'Ingreso',
@@ -181,7 +188,6 @@ export function AppProvider({ children }) {
     setMovimientosCaja([]);
   };
 
-  // Al cerrar caja, guardar en historial con sus movimientos
   const cerrarCaja = () => {
     if (cajaAbierta) {
       const resumen = {

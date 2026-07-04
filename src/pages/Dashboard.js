@@ -106,7 +106,7 @@ export default function Dashboard() {
           {products.slice(0,5).map(p => (
             <div key={p.id} style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
               <span style={{fontSize:12,color:'var(--text-mid)'}}>{p.nombre}</span>
-              <span style={{fontSize:12,fontWeight:600,color: p.sacos < 5 ? 'var(--red)' : 'var(--green)'}}>{p.sacos} sacos</span>
+              <span style={{fontSize:12,fontWeight:600,color: p.sacos < 5 ? 'var(--red)' : 'var(--green)'}}>{p.tipoVenta==='unidad' ? `${p.unidades||0} und.` : `${p.sacos||0} sacos`}</span>
             </div>
           ))}
         </div>
