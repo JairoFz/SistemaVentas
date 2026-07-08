@@ -86,6 +86,7 @@ export default function Kardex() {
               <th>Tipo</th>
               <th className="text-right">Δ Sacos</th>
               <th className="text-right">Δ Kg</th>
+              <th className="text-right">Δ Unid.</th>
               <th>Nota</th>
               <th>Usuario</th>
             </tr>
@@ -139,6 +140,22 @@ export default function Kardex() {
                   >
                     {k.deltaKg > 0 ? "+" : ""}
                     {k.deltaKg?.toFixed(2)}
+                  </td>
+                  <td
+                    className="text-right"
+                    style={{
+                      fontWeight: 600,
+                      color: (k.deltaUnidades || 0) >= 0 ? "var(--green)" : "var(--red)",
+                    }}
+                  >
+                    {k.deltaUnidades !== undefined && k.deltaUnidades !== 0 ? (
+                      <>
+                        {k.deltaUnidades > 0 ? "+" : ""}
+                        {k.deltaUnidades}
+                      </>
+                    ) : (
+                      <span style={{ color: "var(--text-light)" }}>—</span>
+                    )}
                   </td>
                   <td style={{ fontSize: 12.5, color: "var(--text-light)" }}>
                     {k.nota}

@@ -28,7 +28,11 @@ export function Reportes() {
     })
   );
   const totalGastos = gastosDelPeriodo.reduce((s, m) => s + parseFloat(m.monto || 0), 0);
-  const neto = totalVentas - totalGastos;
+  const totalCostoVentas = filtradas.reduce((s, v) => {
+    return s + (v.items || []).reduce((sum, item) => sum + (parseFloat(item.costoTotal) || 0), 0);
+  }, 0);
+  const gananciaBruta = totalVentas - totalCostoVentas;
+  const gananciaNeta = gananciaBruta - totalGastos;
 
   const descargarCSV = () => {
     const rows = [['Código','Fecha','Cliente','Vendedor','Método Pago','Tipo','Total']];
@@ -136,15 +140,15 @@ export function Reportes() {
 
       <div class="resumen">
         <div class="stat"><div class="stat-label">Total ventas</div><div class="stat-value green">S/ ${totalVentas.toFixed(2)}</div></div>
+        <div class="stat"><div class="stat-label">Costo Ventas</div><div class="stat-value" style="color:#d4762a">S/ ${totalCostoVentas.toFixed(2)}</div></div>
+        <div class="stat"><div class="stat-label">Utilidad Bruta</div><div class="stat-value green">S/ ${gananciaBruta.toFixed(2)}</div></div>
         <div class="stat"><div class="stat-label">Total gastos</div><div class="stat-value red">S/ ${totalGastos.toFixed(2)}</div></div>
         <div class="stat"><div class="stat-label">Transacciones</div><div class="stat-value">${filtradas.length}</div></div>
-        <div class="stat"><div class="stat-label">Ticket promedio</div><div class="stat-value">S/ ${filtradas.length ? (totalVentas/filtradas.length).toFixed(2) : '0.00'}</div></div>
-        <div class="stat"><div class="stat-label">Efectivo / Yape</div><div class="stat-value">${filtradas.filter(v=>v.metodoPago==='Efectivo').length} / ${filtradas.filter(v=>v.metodoPago==='Yape').length}</div></div>
       </div>
 
       <div class="neto-box">
-        <div class="label">NETO DEL PERÍODO (Ventas − Gastos)</div>
-        <div class="value">S/ ${neto.toFixed(2)}</div>
+        <div class="label">UTILIDAD NETA REAL DEL PERÍODO (Ventas − Costo − Gastos)</div>
+        <div class="value">S/ ${gananciaNeta.toFixed(2)}</div>
       </div>
 
       <h3>Detalle de ventas</h3>
@@ -197,16 +201,24 @@ export function Reportes() {
         {(filtradas.length > 0 || gastosDelPeriodo.length > 0) && (
           <div style={{background:'var(--green-light)',padding:'12px 14px',borderRadius:8,marginBottom:16,fontSize:13}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-              <span>Ventas ({filtradas.length} transacciones)</span>
+              <span>Total Ventas ({filtradas.length} transacciones):</span>
               <strong style={{color:'var(--green)'}}>S/ {totalVentas.toFixed(2)}</strong>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-              <span>Gastos ({gastosDelPeriodo.length})</span>
+              <span>Costo de Ventas (Costo Mercadería -):</span>
+              <strong style={{color:'var(--orange)'}}>− S/ {totalCostoVentas.toFixed(2)}</strong>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px dotted var(--border)',paddingTop:4,marginBottom:4}}>
+              <span style={{fontWeight:600}}>Utilidad Bruta:</span>
+              <strong style={{color:'var(--green)'}}>S/ {gananciaBruta.toFixed(2)}</strong>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+              <span>Gastos / Salidas de Caja (-):</span>
               <strong style={{color:'var(--red)'}}>− S/ {totalGastos.toFixed(2)}</strong>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px solid var(--border)',paddingTop:6,marginTop:4}}>
-              <span style={{fontWeight:600}}>Neto estimado</span>
-              <strong>S/ {neto.toFixed(2)}</strong>
+              <span style={{fontWeight:600}}>Utilidad Neta Real:</span>
+              <strong>S/ {gananciaNeta.toFixed(2)}</strong>
             </div>
           </div>
         )}

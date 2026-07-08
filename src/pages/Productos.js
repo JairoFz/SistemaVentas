@@ -6,7 +6,8 @@ const EMPTY = {
   nombre:'', categoria:'Aves', etapa:'', tipoVenta:'sacos',
   kgPorSaco: 40,
   pSaco:0, pMedio:0, pArroba:0, pKilo:0, pUnidad:0,
-  sacos:0, granel:0, unidades:0
+  sacos:0, granel:0, unidades:0, precioCosto:0,
+  stockMinimo:5, lote:'', fechaVencimiento:''
 };
 const CATEGORIAS_DEFAULT = ['Aves','Cerdos','Medicinas','Equipos Avícolas','Otros'];
 
@@ -96,6 +97,24 @@ function ProductModal({ producto, onClose, onSave, todasCategorias }) {
               </div>
             </>
           )}
+          <div className="form-group" style={{marginTop:12}}>
+            <label className="form-label">Precio de Costo (Proveedor S/)</label>
+            <input className="form-input" type="number" step="0.01" value={form.precioCosto||0} onChange={e=>f('precioCosto',parseFloat(e.target.value)||0)} placeholder="Precio de compra al proveedor"/>
+          </div>
+          <div className="form-row" style={{marginTop:12}}>
+            <div className="form-group">
+              <label className="form-label">Alerta Stock Mínimo</label>
+              <input className="form-input" type="number" value={form.stockMinimo!==undefined?form.stockMinimo:5} onChange={e=>f('stockMinimo',parseInt(e.target.value)||0)}/>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Código de Lote</label>
+              <input className="form-input" value={form.lote||''} onChange={e=>f('lote',e.target.value)} placeholder="Ej: LOTE-A12"/>
+            </div>
+          </div>
+          <div className="form-group" style={{marginTop:12}}>
+            <label className="form-label">Fecha de Vencimiento</label>
+            <input className="form-input" type="date" value={form.fechaVencimiento||''} onChange={e=>f('fechaVencimiento',e.target.value)}/>
+          </div>
         </div>
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
@@ -109,16 +128,29 @@ function ProductModal({ producto, onClose, onSave, todasCategorias }) {
 function StockModal({ producto, tipo, onClose, onSave }) {
   const [cantidad, setCantidad] = useState(0);
   const [nota, setNota] = useState('');
+  const [lote, setLote] = useState('');
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
   const kgPorSaco = producto.kgPorSaco || 40;
   const esUnidad = producto.tipoVenta === 'unidad';
 
   const registrar = () => {
     const cant = parseInt(cantidad) || 0;
     if (cant <= 0) return;
+
+    let notaFinal = nota;
+    if (!notaFinal) {
+      const loteText = lote ? ` (Lote: ${lote})` : '';
+      notaFinal = esUnidad 
+        ? `Ingreso ${cant} unidad(es)${loteText}` 
+        : tipo === 'ingreso' 
+          ? `Ingreso ${cant} saco(s)${loteText}` 
+          : `Apertura ${cant} saco(s) → ${cant * kgPorSaco} kg granel`;
+    }
+
     if (tipo === 'ingreso') {
-      onSave(producto.id, esUnidad ? 0 : cant, 0, nota || `Ingreso ${cant} ${esUnidad?'unidad(es)':'saco(s)'}`, esUnidad ? cant : 0);
+      onSave(producto.id, esUnidad ? 0 : cant, 0, notaFinal, esUnidad ? cant : 0, lote, fechaVencimiento);
     } else {
-      onSave(producto.id, -cant, cant * kgPorSaco, nota || `Apertura ${cant} saco(s) → ${cant * kgPorSaco} kg granel`, 0);
+      onSave(producto.id, -cant, cant * kgPorSaco, notaFinal, 0);
     }
     onClose();
   };
@@ -148,6 +180,20 @@ function StockModal({ producto, tipo, onClose, onSave }) {
               </div>
             )}
           </div>
+          
+          {tipo === 'ingreso' && (
+            <div className="form-row" style={{ marginBottom: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Lote (Opcional)</label>
+                <input className="form-input" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej: L-409" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Fecha Vencimiento (Opcional)</label>
+                <input className="form-input" type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+              </div>
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Nota (opcional)</label>
             <input className="form-input" value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ej: Compra proveedor..."/>
@@ -187,7 +233,7 @@ export default function Productos() {
           <thead>
             <tr>
               <th>Producto</th><th>Etapa / Desc.</th><th>Tipo venta</th><th>Kg/Saco</th>
-              <th>P. Saco</th><th>P. Medio</th><th>P. Arroba</th><th>P. Kilo / Unid.</th>
+              <th>P. Costo</th><th>P. Saco</th><th>P. Medio</th><th>P. Arroba</th><th>P. Kilo / Unid.</th>
               <th>Stock</th><th className="text-right">Acciones</th>
             </tr>
           </thead>
@@ -200,6 +246,7 @@ export default function Productos() {
                 <td>{p.etapa ? <span className="badge badge-green">{p.etapa}</span> : <span style={{color:'var(--text-light)'}}>—</span>}</td>
                 <td><span className={`badge ${p.tipoVenta==='unidad'?'badge-orange':'badge-gray'}`}>{p.tipoVenta==='unidad'?'Unidad':'Sacos/kg'}</span></td>
                 <td>{p.tipoVenta==='unidad' ? <span style={{color:'var(--text-light)'}}>—</span> : <strong>{p.kgPorSaco||40} kg</strong>}</td>
+                <td><strong>S/ {(p.precioCosto||0).toFixed(2)}</strong></td>
                 {p.tipoVenta==='unidad' ? (
                   <><td colSpan={3} style={{color:'var(--text-light)'}}>—</td><td style={{fontWeight:600}}>S/ {(p.pUnidad||0).toFixed(2)}</td></>
                 ) : (

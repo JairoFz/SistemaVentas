@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 
 export default function Login() {
@@ -7,10 +8,23 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!login(email, password)) setError('Correo o contraseña incorrectos');
+    const ok = await login(email, password);
+    if (!ok) setError('Correo o contraseña incorrectos');
   };
+  useEffect(() => {
+    const probarIPC = async () => {
+      if (window.api && window.api.saludar) {
+        const respuesta = await window.api.saludar();
+        console.log(respuesta);
+      } else {
+        console.log("No estamos en entorno Electron (window.api no disponible). Fallback a LocalStorage.");
+      }
+    };
+
+    probarIPC();
+  }, []);
 
   return (
     <div className="login-page">

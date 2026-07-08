@@ -28,6 +28,20 @@ export default function Dashboard() {
     }, {})
   ).sort((a,b) => b[1]-a[1]).slice(0,5);
 
+  const vencimientos = products
+    .filter(p => p.fechaVencimiento && p.fechaVencimiento.trim() !== '')
+    .map(p => {
+      const parts = p.fechaVencimiento.split('-');
+      const expDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      const todayDate = new Date();
+      todayDate.setHours(0,0,0,0);
+      const diffTime = expDate - todayDate;
+      const diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return { ...p, diasRestantes };
+    })
+    .filter(p => p.diasRestantes <= 30)
+    .sort((a, b) => a.diasRestantes - b.diasRestantes);
+
   return (
     <div>
       <div className="page-header">
@@ -103,14 +117,79 @@ export default function Dashboard() {
 
           <hr className="divider"/>
           <h3 style={{fontSize:16,marginBottom:12}}>Stock por producto</h3>
-          {products.slice(0,5).map(p => (
-            <div key={p.id} style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-              <span style={{fontSize:12,color:'var(--text-mid)'}}>{p.nombre}</span>
-              <span style={{fontSize:12,fontWeight:600,color: p.sacos < 5 ? 'var(--red)' : 'var(--green)'}}>{p.tipoVenta==='unidad' ? `${p.unidades||0} und.` : `${p.sacos||0} sacos`}</span>
-            </div>
-          ))}
+          {products.slice(0,5).map(p => {
+            const minStock = p.stockMinimo !== undefined ? p.stockMinimo : 5;
+            const esBajo = p.tipoVenta === 'unidad' ? (p.unidades || 0) < minStock : (p.sacos || 0) < minStock;
+            return (
+              <div key={p.id} style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                <span style={{fontSize:12,color:'var(--text-mid)'}}>{p.nombre}</span>
+                <span style={{fontSize:12,fontWeight:600,color: esBajo ? 'var(--red)' : 'var(--green)'}}>
+                  {p.tipoVenta==='unidad' ? `${p.unidades||0} und.` : `${p.sacos||0} sacos`}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
+
+      {vencimientos.length > 0 && (
+        <div className="card" style={{ marginTop: 24, borderLeft: '4px solid var(--red)' }}>
+          <h3 style={{ fontSize: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'var(--red)' }}>⚠️</span> Alertas de Vencimiento / Lotes Próximos a Caducar
+          </h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Lote</th>
+                  <th>Fecha de Vencimiento</th>
+                  <th>Estado / Alerta</th>
+                  <th className="text-right">Stock Disponible</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vencimientos.map(v => {
+                  const isExpired = v.diasRestantes < 0;
+                  const statusColor = isExpired ? 'var(--red)' : '#d4762a';
+                  const statusBg = isExpired ? '#fdf2f2' : '#fffaf0';
+                  const statusText = isExpired 
+                    ? 'VENCIDO' 
+                    : v.diasRestantes === 0 
+                      ? 'Vence hoy' 
+                      : `Vence en ${v.diasRestantes} días`;
+                  
+                  const parts = v.fechaVencimiento.split('-');
+                  const cleanDateStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                  
+                  return (
+                    <tr key={v.id}>
+                      <td style={{ fontWeight: 600 }}>{v.nombre}</td>
+                      <td><span className="badge badge-gray">{v.lote || 'Sin Lote'}</span></td>
+                      <td style={{ fontSize: 13 }}>{cleanDateStr}</td>
+                      <td>
+                        <span style={{ 
+                          color: statusColor, 
+                          background: statusBg, 
+                          padding: '4px 8px', 
+                          borderRadius: 4, 
+                          fontWeight: 600, 
+                          fontSize: 12 
+                        }}>
+                          {statusText}
+                        </span>
+                      </td>
+                      <td className="text-right" style={{ fontWeight: 600 }}>
+                        {v.tipoVenta === 'unidad' ? `${v.unidades||0} und.` : `${v.sacos||0} sacos`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

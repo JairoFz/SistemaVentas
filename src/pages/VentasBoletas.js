@@ -29,17 +29,28 @@ function BoletaModal({ venta, onClose }) {
               <tr><th>Item</th><th>Cant</th><th>P.U.</th><th>Total</th></tr>
             </thead>
             <tbody>
-              {venta.items.map((item,i)=>(
-                <tr key={i}>
-                  <td>
-                    <div style={{fontWeight:500}}>{item.nombre}</div>
-                    <div style={{fontSize:10,color:'#999',textTransform:'capitalize'}}>{item.presentacion} {item.presentacion==='saco'?'40kg':item.presentacion==='medio'?'20kg':item.presentacion==='arroba'?'11.5kg':''}</div>
-                  </td>
-                  <td style={{textAlign:'center'}}>{item.cantidad}</td>
-                  <td>S/ {item.precioUnitario.toFixed(2)}</td>
-                  <td style={{fontWeight:600}}>S/ {item.subtotal.toFixed(2)}</td>
-                </tr>
-              ))}
+              {venta.items.map((item,i)=>{
+                let descripcion = '';
+                const kgPorSaco = item.kgPorSaco || 40;
+                if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
+                else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
+                else if (item.presentacion === 'arroba') descripcion = `Arroba ${(11.5)}kg`;
+                else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
+                else if (item.presentacion === 'importe') descripcion = `Por importe`;
+                else descripcion = 'Unidad';
+
+                return (
+                  <tr key={i}>
+                    <td>
+                      <div style={{fontWeight:500}}>{item.nombre}</div>
+                      <div style={{fontSize:10,color:'#999',textTransform:'capitalize'}}>{descripcion}</div>
+                    </td>
+                    <td style={{textAlign:'center'}}>{item.presentacion === 'importe' ? '—' : item.cantidad}</td>
+                    <td>{item.presentacion === 'importe' ? '—' : `S/ ${item.precioUnitario.toFixed(2)}`}</td>
+                    <td style={{fontWeight:600}}>S/ {item.subtotal.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div className="boleta-total"><span>TOTAL</span><span>S/ {venta.total.toFixed(2)}</span></div>

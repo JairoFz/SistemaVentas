@@ -123,7 +123,7 @@ function ImporteModal({ producto, onClose, onAdd }) {
 }
 
 export default function CajaPOS() {
-  const { products, clients, cajaAbierta, abrirCaja, registrarVenta, currentUser } = useApp();
+  const { products, clients, cajaAbierta, abrirCaja, registrarVenta, currentUser, addClient } = useApp();
   const todasCategorias = [...new Set(products.map(p=>p.categoria))];
   const [categoria, setCategoria] = useState(todasCategorias[0] || 'Aves');
   const [busqueda, setBusqueda] = useState('');
@@ -134,6 +134,7 @@ export default function CajaPOS() {
   const [boletaVenta, setBoletaVenta] = useState(null);
   const [montoApertura, setMontoApertura] = useState('');
   const [showApertura, setShowApertura] = useState(false);
+  const [showNuevoCliente, setShowNuevoCliente] = useState(false);
   const [editandoPrecio, setEditandoPrecio] = useState(null);
   const [modalImporte, setModalImporte] = useState(null);
 
@@ -275,11 +276,38 @@ export default function CajaPOS() {
 
   const cobrar = () => {
     if (carrito.length === 0) return;
+
+    if (tipoBoleta === 'factura') {
+      const ruc = (cliente?.dni || '').trim();
+      const direccion = (cliente?.direccion || '').trim();
+      
+      if (clienteId === 1) {
+        alert("No se puede emitir una Factura a 'Cliente General'. Seleccione o registre un cliente con RUC de 11 dígitos.");
+        return;
+      }
+      if (ruc.length !== 11) {
+        alert(`El cliente seleccionado tiene un documento inválido (${ruc || 'Sin documento'}). Las facturas requieren un RUC de 11 dígitos.`);
+        return;
+      }
+      if (!direccion) {
+        alert("El cliente seleccionado no tiene dirección fiscal. Las facturas requieren dirección registrada.");
+        return;
+      }
+    }
+
+    if (tipoBoleta === 'boleta' && total >= 700 && clienteId === 1) {
+      if (!window.confirm("Las ventas en Boleta mayores o iguales a S/ 700.00 requieren identificar al cliente por ley (DNI/RUC). ¿Desea continuar de todos modos?")) {
+        return;
+      }
+    }
+
     const venta = {
       items: carrito,
       total,
       clienteId,
       clienteNombre: cliente?.nombre || 'Cliente Varios',
+      clienteDocumento: cliente?.dni || '',
+      clienteDireccion: cliente?.direccion || '',
       vendedor: currentUser?.nombre,
       metodoPago,
       tipo: tipoBoleta,
@@ -485,9 +513,18 @@ export default function CajaPOS() {
             </div>
             <div className="cart-footer">
               <div className="form-group">
-                <label className="form-label">Cliente</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Cliente</label>
+                  <button 
+                    type="button"
+                    onClick={() => setShowNuevoCliente(true)} 
+                    style={{ background: 'none', border: 'none', color: 'var(--green)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <Plus size={12} /> Registrar Rápido
+                  </button>
+                </div>
                 <select className="form-select" value={clienteId} onChange={e=>setClienteId(Number(e.target.value))}>
-                  {clients.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  {clients.map(c=><option key={c.id} value={c.id}>{c.nombre} {c.dni ? `(${c.dni})` : ''}</option>)}
                 </select>
               </div>
               <div className="cart-select-row">
@@ -520,6 +557,121 @@ export default function CajaPOS() {
 
       {boletaVenta && <BoletaModal venta={boletaVenta} onClose={()=>setBoletaVenta(null)} />}
       {modalImporte && <ImporteModal producto={modalImporte} onClose={()=>setModalImporte(null)} onAdd={addItem} />}
+      {showNuevoCliente && (
+        <NuevoClienteModal 
+          onClose={() => setShowNuevoCliente(false)} 
+          onSave={(nuevoC) => {
+            const id = Date.now();
+            addClient({ ...nuevoC, id });
+            setClienteId(id);
+            setShowNuevoCliente(false);
+          }} 
+        />
+      )}
+    </div>
+  );
+}
+
+function NuevoClienteModal({ onClose, onSave }) {
+  const [doc, setDoc] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const consultar = async () => {
+    if (!window.api) {
+      alert("Consulta SUNAT/RENIEC solo disponible en app de escritorio.");
+      return;
+    }
+    const cleanDoc = doc.trim();
+    if (cleanDoc.length !== 8 && cleanDoc.length !== 11) return;
+    
+    setLoading(true);
+    const token = localStorage.getItem('sunat_api_token') || '';
+    
+    try {
+      if (cleanDoc.length === 8) {
+        const res = await window.api.consultarDni(cleanDoc, token);
+        if (res.success && res.data) {
+          const nombreCompleto = `${res.data.nombres || ''} ${res.data.apellidoPaterno || ''} ${res.data.apellidoMaterno || ''}`.replace(/\s+/g, ' ').trim();
+          setNombre(nombreCompleto);
+        } else {
+          alert(`Error: ${res.error || 'DNI no encontrado.'}`);
+        }
+      } else {
+        const res = await window.api.consultarRuc(cleanDoc, token);
+        if (res.success && res.data) {
+          setNombre(res.data.razonSocial || res.data.nombre || res.data.razon_social || '');
+          setDireccion(res.data.direccion || '');
+        } else {
+          alert(`Error: ${res.error || 'RUC no encontrado.'}`);
+        }
+      }
+    } catch (e) {
+      alert("Error al conectar con la API.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const guardar = () => {
+    if (!nombre.trim()) return;
+    onSave({
+      nombre,
+      dni: doc,
+      telefono,
+      direccion
+    });
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: 400 }}>
+        <div className="modal-header">
+          <h2>Registrar Cliente Rápido</h2>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer' }} onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">DNI / RUC (RENIEC/SUNAT)</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input 
+                className="form-input" 
+                value={doc} 
+                onChange={e => setDoc(e.target.value.replace(/\D/g, ''))} 
+                placeholder="8 o 11 dígitos"
+                maxLength={11}
+              />
+              <button 
+                type="button" 
+                className="btn btn-outline"
+                style={{ padding: '0 12px', whiteSpace: 'nowrap' }}
+                onClick={consultar}
+                disabled={loading || (doc.length !== 8 && doc.length !== 11)}
+              >
+                {loading ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Nombre / Razón Social *</label>
+            <input className="form-input" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre o Razón Social" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Teléfono</label>
+            <input className="form-input" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="999..." />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Dirección Fiscal / Habitación</label>
+            <input className="form-input" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Dirección completa" />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" onClick={guardar} disabled={!nombre.trim()}>Guardar y Seleccionar</button>
+        </div>
+      </div>
     </div>
   );
 }

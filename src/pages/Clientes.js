@@ -9,6 +9,50 @@ export default function Clientes() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [editId, setEditId] = useState(null);
+  const [loadingQuery, setLoadingQuery] = useState(false);
+
+  const consultarDoc = async () => {
+    if (!window.api) {
+      alert("La consulta SUNAT/RENIEC solo está disponible en la aplicación de escritorio.");
+      return;
+    }
+    const doc = form.dni.trim();
+    if (doc.length !== 8 && doc.length !== 11) return;
+    
+    setLoadingQuery(true);
+    const token = localStorage.getItem('sunat_api_token') || '';
+    
+    try {
+      if (doc.length === 8) {
+        const res = await window.api.consultarDni(doc, token);
+        if (res.success && res.data) {
+          const nombreCompleto = `${res.data.nombres || ''} ${res.data.apellidoPaterno || ''} ${res.data.apellidoMaterno || ''}`.replace(/\s+/g, ' ').trim();
+          setForm(prev => ({
+            ...prev,
+            nombre: nombreCompleto
+          }));
+        } else {
+          alert(`Error: ${res.error || 'No se encontraron datos para este DNI.'}`);
+        }
+      } else {
+        const res = await window.api.consultarRuc(doc, token);
+        if (res.success && res.data) {
+          setForm(prev => ({
+            ...prev,
+            nombre: res.data.razonSocial || res.data.nombre || res.data.razon_social || '',
+            direccion: res.data.direccion || ''
+          }));
+        } else {
+          alert(`Error: ${res.error || 'No se encontraron datos para este RUC.'}`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Ocurrió un error inesperado al conectar con el servidor.");
+    } finally {
+      setLoadingQuery(false);
+    }
+  };
 
   const open = (c=null) => { setForm(c ? {...c} : EMPTY); setEditId(c?.id||null); setModal(true); };
   const close = () => { setModal(false); setForm(EMPTY); setEditId(null); };
@@ -54,10 +98,31 @@ export default function Clientes() {
               <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--text-light)'}} onClick={close}><X size={18}/></button>
             </div>
             <div className="modal-body">
-              <div className="form-group"><label className="form-label">Nombre / Razón social *</label>
-                <input className="form-input" value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Nombre completo o razón social"/></div>
-              <div className="form-group"><label className="form-label">DNI / RUC</label>
-                <input className="form-input" value={form.dni} onChange={e=>setForm({...form,dni:e.target.value})} placeholder="Número de documento"/></div>
+              <div className="form-group">
+                <label className="form-label">DNI / RUC (RENIEC/SUNAT)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input 
+                    className="form-input" 
+                    value={form.dni} 
+                    onChange={e=>setForm({...form,dni:e.target.value.replace(/\D/g, '')})} 
+                    placeholder="Número de documento (8 o 11 dígitos)"
+                    maxLength={11}
+                  />
+                  <button 
+                    type="button"
+                    className="btn btn-outline" 
+                    style={{ padding: '0 14px', whiteSpace: 'nowrap', minHeight: 38 }}
+                    onClick={consultarDoc}
+                    disabled={loadingQuery || (form.dni.length !== 8 && form.dni.length !== 11)}
+                  >
+                    {loadingQuery ? 'Buscando...' : 'Consultar'}
+                  </button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Nombre / Razón social *</label>
+                <input className="form-input" value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Nombre completo o razón social"/>
+              </div>
               <div className="form-group"><label className="form-label">Teléfono</label>
                 <input className="form-input" value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})} placeholder="999 999 999"/></div>
               <div className="form-group"><label className="form-label">Dirección</label>
