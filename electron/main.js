@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
@@ -101,6 +101,57 @@ ipcMain.handle('db:agregar-movimiento-caja', async (e, mov) => {
 });
 ipcMain.handle('db:ingresar-stock', async (e, op) => {
   return dbService.ingresarStock(op);
+});
+ipcMain.handle('db:add-proveedor', async (e, p) => {
+  return dbService.addProveedor(p);
+});
+ipcMain.handle('db:update-proveedor', async (e, p) => {
+  return dbService.updateProveedor(p);
+});
+ipcMain.handle('db:delete-proveedor', async (e, id) => {
+  return dbService.deleteProveedor(id);
+});
+ipcMain.handle('db:registrar-compra', async (e, c) => {
+  return dbService.registrarCompra(c);
+});
+ipcMain.handle('db:registrar-abono', async (e, abono) => {
+  return dbService.registrarAbonoCliente(abono);
+});
+ipcMain.handle('db:registrar-abono-proveedor', async (e, abono) => {
+  return dbService.registrarAbonoProveedor(abono);
+});
+ipcMain.handle('db:update-empresa-config', async (e, config) => {
+  return dbService.updateEmpresaConfig(config);
+});
+ipcMain.handle('print:export-pdf', async (e, { html, filename }) => {
+  const { filePath } = await dialog.showSaveDialog({
+    title: 'Guardar Comprobante PDF',
+    defaultPath: path.join(app.getPath('documents'), `${filename}.pdf`),
+    filters: [{ name: 'Documento PDF', extensions: ['pdf'] }]
+  });
+
+  if (!filePath) return { success: false, error: 'Guardado cancelado' };
+
+  try {
+    const pdfWin = new BrowserWindow({ show: false });
+    await pdfWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    
+    const data = await pdfWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A6',
+      margins: { top: 0, bottom: 0, left: 0, right: 0 }
+    });
+
+    fs.writeFileSync(filePath, data);
+    pdfWin.close();
+
+    shell.showItemInFolder(filePath);
+
+    return { success: true, filePath };
+  } catch (err) {
+    console.error("Error al exportar PDF:", err);
+    return { success: false, error: err.message };
+  }
 });
 
 // Autenticación de Usuarios

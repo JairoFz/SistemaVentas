@@ -1,69 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Eye, Printer } from 'lucide-react';
-import { imprimirBoleta } from '../utils/imprimirBoleta';
-
-function BoletaModal({ venta, onClose }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal boleta-modal" onClick={e=>e.stopPropagation()}>
-        <div className="modal-body">
-          <div className="boleta-header">
-            <div className="logo">🌾</div>
-            <h3>FERCORD</h3>
-            <p>Nutrición Balanceada · Aves y Cerdos</p>
-            <hr style={{border:'none',borderTop:'1px dashed #ccc',margin:'12px 0 8px'}}/>
-            <div style={{fontWeight:700,fontSize:14}}>
-              {venta.tipo==='factura'?'FACTURA DE VENTA':'BOLETA DE VENTA'}
-            </div>
-            <div style={{fontSize:13}}>{venta.codigo}</div>
-            <div style={{fontSize:11,color:'#999',marginTop:2}}>{new Date(venta.fecha).toLocaleString('es-PE')}</div>
-          </div>
-          <div className="boleta-info">
-            <p><strong>Cliente:</strong> {venta.clienteNombre}</p>
-            <p><strong>Vendedor:</strong> {venta.vendedor}</p>
-            <p><strong>Pago:</strong> {venta.metodoPago}</p>
-          </div>
-          <table className="boleta-table">
-            <thead>
-              <tr><th>Item</th><th>Cant</th><th>P.U.</th><th>Total</th></tr>
-            </thead>
-            <tbody>
-              {venta.items.map((item,i)=>{
-                let descripcion = '';
-                const kgPorSaco = item.kgPorSaco || 40;
-                if (item.presentacion === 'saco') descripcion = `Saco ${kgPorSaco}kg`;
-                else if (item.presentacion === 'medio') descripcion = `Medio ${(kgPorSaco/2).toFixed(1)}kg`;
-                else if (item.presentacion === 'arroba') descripcion = `Arroba ${(11.5)}kg`;
-                else if (item.presentacion === 'kilo') descripcion = `${item.cantidad} kg`;
-                else if (item.presentacion === 'importe') descripcion = `Por importe`;
-                else descripcion = 'Unidad';
-
-                return (
-                  <tr key={i}>
-                    <td>
-                      <div style={{fontWeight:500}}>{item.nombre}</div>
-                      <div style={{fontSize:10,color:'#999',textTransform:'capitalize'}}>{descripcion}</div>
-                    </td>
-                    <td style={{textAlign:'center'}}>{item.presentacion === 'importe' ? '—' : item.cantidad}</td>
-                    <td>{item.presentacion === 'importe' ? '—' : `S/ ${item.precioUnitario.toFixed(2)}`}</td>
-                    <td style={{fontWeight:600}}>S/ {item.subtotal.toFixed(2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="boleta-total"><span>TOTAL</span><span>S/ {venta.total.toFixed(2)}</span></div>
-          <div className="boleta-gracias">¡Gracias por su compra!</div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
-          <button className="btn btn-primary" onClick={()=>imprimirBoleta(venta)}><Printer size={14}/>Imprimir</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import BoletaModal from '../components/BoletaModal';
 
 export default function VentasBoletas() {
   const { ventas } = useApp();

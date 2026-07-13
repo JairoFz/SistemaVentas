@@ -209,7 +209,7 @@ function StockModal({ producto, tipo, onClose, onSave }) {
 }
 
 export default function Productos() {
-  const { products, addProduct, updateProduct, deleteProduct, ingresarStock } = useApp();
+  const { products, addProduct, updateProduct, deleteProduct, ingresarStock, currentUser } = useApp();
   const [categoria, setCategoria] = useState('Aves');
   const [modal, setModal] = useState(null);
 
@@ -221,7 +221,7 @@ export default function Productos() {
     <div>
       <div className="header-row page-header">
         <div><h1>Productos / Almacén</h1><p>Catálogo de productos: concentrados, medicinas, equipos y más</p></div>
-        <button className="btn btn-primary" onClick={()=>setModal({type:'add'})}><Plus size={15}/>Nuevo producto</button>
+        {currentUser?.rol === 'admin' && <button className="btn btn-primary" onClick={()=>setModal({type:'add'})}><Plus size={15}/>Nuevo producto</button>}
       </div>
       <div className="category-tabs mb-4" style={{flexWrap:'wrap'}}>
         {cats.map(cat=>(
@@ -263,8 +263,12 @@ export default function Productos() {
                   <div style={{display:'flex',gap:5,justifyContent:'flex-end'}}>
                     <button className="action-btn stock" title="Ingreso de stock" onClick={()=>setModal({type:'stock',producto:p})}><PackagePlus size={13}/></button>
                     {p.tipoVenta!=='unidad' && <button className="action-btn" style={{background:'#f0f0f0',color:'#666'}} title="Apertura de saco" onClick={()=>setModal({type:'apertura',producto:p})}><Scissors size={13}/></button>}
-                    <button className="action-btn edit" onClick={()=>setModal({type:'edit',producto:p})}><Pencil size={13}/></button>
-                    <button className="action-btn del" onClick={()=>deleteProduct(p.id)}><Trash2 size={13}/></button>
+                    {currentUser?.rol === 'admin' && (
+                      <>
+                        <button className="action-btn edit" onClick={()=>setModal({type:'edit',producto:p})}><Pencil size={13}/></button>
+                        <button className="action-btn del" onClick={()=>deleteProduct(p.id)}><Trash2 size={13}/></button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

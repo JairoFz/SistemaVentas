@@ -39,6 +39,20 @@ export function AppProvider({ children }) {
   const [movimientosCaja, setMovimientosCaja] = useState(() => load('fercord_movimientos', []));
   const [historialCajas, setHistorialCajas] = useState(() => load('fercord_historial_cajas', []));
   const [correlativos, setCorrelativos] = useState(() => load('fercord_correlativos', { boleta: 0, factura: 0 }));
+  const [proveedores, setProveedores] = useState(() => load('fercord_proveedores', []));
+  const [compras, setCompras] = useState(() => load('fercord_compras', []));
+  const [pagosDeuda, setPagosDeuda] = useState(() => load('fercord_pagos_deuda', []));
+  const [pagosProveedores, setPagosProveedores] = useState(() => load('fercord_pagos_proveedores', []));
+  
+  const defaultEmpresaConfig = {
+    nombre: 'FERCORD',
+    ruc: '10452389712',
+    slogan: 'Nutrición Balanceada · Aves y Cerdos',
+    direccion: 'San Vicente de Cañete',
+    telefono: '',
+    logo: ''
+  };
+  const [empresaConfig, setEmpresaConfig] = useState(() => load('fercord_empresa_config', defaultEmpresaConfig));
 
   // Carga asíncrona inicial desde SQLite al arrancar en Electron
   useEffect(() => {
@@ -55,6 +69,11 @@ export function AppProvider({ children }) {
           setMovimientosCaja(data.movimientosCaja);
           setHistorialCajas(data.historialCajas);
           setCorrelativos(data.correlativos);
+          setProveedores(data.proveedores || []);
+          setCompras(data.compras || []);
+          setPagosDeuda(data.pagosDeuda || []);
+          setPagosProveedores(data.pagosProveedores || []);
+          setEmpresaConfig(data.empresaConfig || defaultEmpresaConfig);
         } catch (e) {
           console.error("Error al cargar datos desde SQLite:", e);
         }
@@ -73,6 +92,11 @@ export function AppProvider({ children }) {
   useEffect(() => { if (!window.api) save('fercord_movimientos', movimientosCaja); }, [movimientosCaja]);
   useEffect(() => { if (!window.api) save('fercord_historial_cajas', historialCajas); }, [historialCajas]);
   useEffect(() => { if (!window.api) save('fercord_correlativos', correlativos); }, [correlativos]);
+  useEffect(() => { if (!window.api) save('fercord_proveedores', proveedores); }, [proveedores]);
+  useEffect(() => { if (!window.api) save('fercord_compras', compras); }, [compras]);
+  useEffect(() => { if (!window.api) save('fercord_pagos_deuda', pagosDeuda); }, [pagosDeuda]);
+  useEffect(() => { if (!window.api) save('fercord_pagos_proveedores', pagosProveedores); }, [pagosProveedores]);
+  useEffect(() => { if (!window.api) save('fercord_empresa_config', empresaConfig); }, [empresaConfig]);
 
   const login = async (email, password) => {
     if (window.api && window.api.authLogin) {
@@ -132,6 +156,206 @@ export function AppProvider({ children }) {
     setClients(prev => prev.filter(x => x.id !== id));
     if (window.api && window.api.dbDeleteClient) {
       window.api.dbDeleteClient(id).catch(console.error);
+    }
+  };
+
+  const addProveedor = (p) => {
+    const newP = { ...p, id: p.id || Date.now() };
+    setProveedores(prev => [...prev, newP]);
+    if (window.api && window.api.dbAddProveedor) {
+      window.api.dbAddProveedor(newP).catch(console.error);
+    }
+  };
+  const updateProveedor = (p) => {
+    setProveedores(prev => prev.map(x => x.id === p.id ? p : x));
+    if (window.api && window.api.dbUpdateProveedor) {
+      window.api.dbUpdateProveedor(p).catch(console.error);
+    }
+  };
+  const deleteProveedor = (id) => {
+    setProveedores(prev => prev.filter(x => x.id !== id));
+    if (window.api && window.api.dbDeleteProveedor) {
+      window.api.dbDeleteProveedor(id).catch(console.error);
+    }
+  };
+
+  const registrarCompra = (c) => {
+    const nuevaCompra = { 
+      ...c, 
+      id: Date.now(),
+      montoPagado: c.montoPagado !== undefined ? c.montoPagado : c.total,
+      montoDeuda: c.montoDeuda !== undefined ? c.montoDeuda : 0,
+      estadoPago: c.estadoPago || 'pagado'
+    };
+    setCompras(prev => [nuevaCompra, ...prev]);
+
+    setProducts(prev => {
+      let next = [...prev];
+      c.items.forEach(item => {
+        next = next.map(p => {
+          if (p.id !== item.productoId) return p;
+          let nuevosSacos = p.sacos || 0;
+          let nuevasUnidades = p.unidades || 0;
+          if (p.tipoVenta === 'unidad') {
+            nuevasUnidades = Math.max(0, nuevasUnidades + item.cantidad);
+          } else {
+            nuevosSacos = Math.max(0, nuevosSacos + item.cantidad);
+          }
+          return {
+            ...p,
+            sacos: nuevosSacos,
+            unidades: nuevasUnidades,
+            precioCosto: item.precioCosto,
+            lote: item.lote || p.lote,
+            fechaVencimiento: item.fechaVencimiento || p.fechaVencimiento
+          };
+        });
+      });
+      return next;
+    });
+
+    const nuevosMovimientosKardex = c.items.map((item, index) => {
+      const nota = `Compra Proveedor: ${c.proveedorNombre || 'Proveedor'} (Lote: ${item.lote || '—'})${c.documento ? ` Ref: ${c.documento}` : ''}`;
+      return {
+        id: Date.now() + index,
+        fecha: c.fecha,
+        producto: item.productoNombre,
+        productoId: item.productoId,
+        tipo: 'Compra Proveedor',
+        deltaSacos: item.tipoVenta === 'unidad' ? 0 : item.cantidad,
+        deltaKg: 0,
+        deltaUnidades: item.tipoVenta === 'unidad' ? item.cantidad : 0,
+        nota,
+        usuario: c.usuario
+      };
+    });
+    setKardex(prev => [...nuevosMovimientosKardex, ...prev]);
+
+    if (window.api && window.api.dbRegistrarCompra) {
+      window.api.dbRegistrarCompra(nuevaCompra).catch(console.error);
+    }
+  };
+
+  const registrarAbonoCliente = (abono) => {
+    const nuevoAbono = { ...abono, id: Date.now() };
+    setPagosDeuda(prev => [nuevoAbono, ...prev]);
+
+    setVentas(prev => {
+      let montoRestante = abono.monto;
+      return [...prev].reverse().map(v => {
+        if (v.clienteId !== abono.clienteId || v.montoDeuda <= 0 || !['pendiente', 'parcial'].includes(v.estadoPago)) {
+          return v;
+        }
+        if (montoRestante <= 0) return v;
+
+        const deudaVenta = v.montoDeuda;
+        if (montoRestante >= deudaVenta) {
+          montoRestante -= deudaVenta;
+          return {
+            ...v,
+            montoPagado: v.total,
+            montoDeuda: 0,
+            estadoPago: 'pagado'
+          };
+        } else {
+          const nuevoPagado = (v.montoPagado || 0) + montoRestante;
+          const nuevaDeuda = deudaVenta - montoRestante;
+          montoRestante = 0;
+          return {
+            ...v,
+            montoPagado: nuevoPagado,
+            montoDeuda: nuevaDeuda,
+            estadoPago: 'parcial'
+          };
+        }
+      }).reverse();
+    });
+
+    if (cajaAbierta) {
+      const mov = {
+        id: Date.now(),
+        tipo: 'Ingreso',
+        concepto: `Cobro Crédito: ${abono.clienteNombre}`,
+        monto: abono.monto,
+        metodoPago: abono.metodoPago,
+        usuario: abono.usuario || currentUser?.nombre,
+        fecha: abono.fecha
+      };
+      setMovimientosCaja(prev => [mov, ...prev]);
+      setCajaAbierta(prev => ({ ...prev, ingresos: (prev.ingresos || 0) + abono.monto }));
+    }
+
+    if (window.api && window.api.dbRegistrarAbono) {
+      window.api.dbRegistrarAbono(nuevoAbono).catch(console.error);
+    }
+  };
+
+  const registrarAbonoProveedor = (abono) => {
+    const nuevoAbono = { ...abono, id: Date.now() };
+    setPagosProveedores(prev => [nuevoAbono, ...prev]);
+
+    setCompras(prev => {
+      let montoRestante = abono.monto;
+      return [...prev].reverse().map(comp => {
+        if (comp.proveedorId !== abono.proveedorId || comp.montoDeuda <= 0 || !['pendiente', 'parcial'].includes(comp.estadoPago)) {
+          return comp;
+        }
+        if (montoRestante <= 0) return comp;
+
+        const deudaCompra = comp.montoDeuda;
+        if (montoRestante >= deudaCompra) {
+          montoRestante -= deudaCompra;
+          return {
+            ...comp,
+            montoPagado: comp.total,
+            montoDeuda: 0,
+            estadoPago: 'pagado'
+          };
+        } else {
+          const nuevoPagado = (comp.montoPagado || 0) + montoRestante;
+          const nuevaDeuda = deudaCompra - montoRestante;
+          montoRestante = 0;
+          return {
+            ...comp,
+            montoPagado: nuevoPagado,
+            montoDeuda: nuevaDeuda,
+            estadoPago: 'parcial'
+          };
+        }
+      }).reverse();
+    });
+
+    if (abono.metodoPago === 'Efectivo') {
+      setMovimientosCaja(prev => {
+        const nuevoMov = {
+          id: Date.now() + 1,
+          tipo: 'Gasto / Salida',
+          concepto: `Pago Deuda Prov: ${abono.proveedorNombre}`,
+          monto: abono.monto,
+          metodoPago: abono.metodoPago,
+          usuario: abono.usuario || '',
+          fecha: abono.fecha
+        };
+        return [nuevoMov, ...prev];
+      });
+      setCajaAbierta(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          egresos: (prev.egresos || 0) + abono.monto
+        };
+      });
+    }
+
+    if (window.api && window.api.dbRegistrarAbonoProveedor) {
+      window.api.dbRegistrarAbonoProveedor(nuevoAbono).catch(console.error);
+    }
+  };
+
+  const updateEmpresaConfig = (config) => {
+    setEmpresaConfig(config);
+    if (window.api && window.api.dbUpdateEmpresaConfig) {
+      window.api.dbUpdateEmpresaConfig(config).catch(console.error);
     }
   };
 
@@ -197,7 +421,42 @@ export function AppProvider({ children }) {
     
     setCorrelativos(prev => ({ ...prev, [tipoKey]: siguiente }));
 
-    const nuevaVenta = { ...venta, id: Date.now(), codigo, fecha: new Date().toISOString() };
+    const itemsConCosto = (venta.items || []).map(item => {
+      const p = products.find(prod => prod.id === item.productoId);
+      let costoTotal = 0;
+      if (p) {
+        const cost = p.precioCosto || 0;
+        const kg = p.kgPorSaco || 40;
+        if (p.tipoVenta === 'unidad' || item.presentacion === 'unidad') {
+          costoTotal = cost * item.cantidad;
+        } else {
+          if (item.presentacion === 'saco') {
+            costoTotal = cost * item.cantidad;
+          } else if (item.presentacion === 'medio') {
+            costoTotal = (cost / 2) * item.cantidad;
+          } else if (item.presentacion === 'arroba') {
+            costoTotal = ((11.5 / kg) * cost) * item.cantidad;
+          } else if (item.presentacion === 'kilo') {
+            costoTotal = ((1 / kg) * cost) * item.cantidad;
+          } else if (item.presentacion === 'importe') {
+            const kgEquivalente = p.pKilo > 0 ? item.subtotal / p.pKilo : 0;
+            costoTotal = (kgEquivalente / kg) * cost;
+          }
+        }
+      }
+      return {
+        ...item,
+        costoTotal: Number(costoTotal.toFixed(2))
+      };
+    });
+
+    const nuevaVenta = { 
+      ...venta, 
+      id: Date.now(), 
+      codigo, 
+      fecha: new Date().toISOString(),
+      items: itemsConCosto
+    };
     setVentas(prev => [nuevaVenta, ...prev]);
 
     const nuevosMovimientos = [];
@@ -278,16 +537,22 @@ export function AppProvider({ children }) {
     setKardex(prev => [...nuevosMovimientos.reverse(), ...prev]);
 
     if (cajaAbierta) {
-      const mov = {
-        id: Date.now(), tipo: 'Ingreso',
-        concepto: `Venta ${codigo}`,
-        monto: venta.total,
-        metodoPago: venta.metodoPago,
-        usuario: currentUser?.nombre,
-        fecha: new Date().toISOString()
-      };
-      setMovimientosCaja(prev => [mov, ...prev]);
-      setCajaAbierta(prev => ({ ...prev, ingresos: (prev.ingresos || 0) + venta.total }));
+      const efectivoIngresado = venta.estadoPago === 'pendiente' 
+        ? 0 
+        : (venta.estadoPago === 'parcial' ? (venta.montoPagado || 0) : venta.total);
+
+      if (efectivoIngresado > 0) {
+        const mov = {
+          id: Date.now(), tipo: 'Ingreso',
+          concepto: venta.estadoPago === 'parcial' ? `Venta ${codigo} (A cuenta)` : `Venta ${codigo}`,
+          monto: efectivoIngresado,
+          metodoPago: venta.metodoPago,
+          usuario: currentUser?.nombre,
+          fecha: new Date().toISOString()
+        };
+        setMovimientosCaja(prev => [mov, ...prev]);
+        setCajaAbierta(prev => ({ ...prev, ingresos: (prev.ingresos || 0) + efectivoIngresado }));
+      }
     }
 
     if (window.api && window.api.dbRegistrarVenta) {
@@ -414,6 +679,11 @@ export function AppProvider({ children }) {
       cajaAbierta, abrirCaja, cerrarCaja, movimientosCaja, agregarMovimientoCaja,
       historialCajas,
       ventasHoy, ventasSemana, stockBajo,
+      proveedores, addProveedor, updateProveedor, deleteProveedor,
+      compras, registrarCompra,
+      pagosDeuda, registrarAbonoCliente,
+      pagosProveedores, registrarAbonoProveedor,
+      empresaConfig, updateEmpresaConfig
     }}>
       {children}
     </AppContext.Provider>

@@ -1,4 +1,4 @@
-export function imprimirBoleta(venta) {
+export function generarHtmlBoleta(venta, config = {}) {
   const items = venta.items.map(item => {
     let descripcion = '';
     const kgPorSaco = item.kgPorSaco || 40;
@@ -22,15 +22,37 @@ export function imprimirBoleta(venta) {
     </tr>
   `}).join('');
 
-  const html = `<!DOCTYPE html><html lang="es"><head>
+  // Cargar logotipo en base64 o emoji por defecto
+  const logoHtml = config.logo
+    ? `<img src="${config.logo}" alt="Logo" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin: 0 auto 6px; display: block;" />`
+    : `<div class="logo" style="font-size: 24px; margin-bottom: 4px; text-align: center;">🌾</div>`;
+
+  const nombreEmpresa = config.nombre || "FERCORD";
+  const sloganEmpresa = config.slogan || "Comercialización de Alimentos Balanceados";
+  
+  // Construir línea de RUC y dirección
+  let rucLine = '';
+  if (config.ruc) rucLine += `RUC: ${config.ruc}`;
+  if (config.direccion) {
+    if (rucLine) rucLine += ` · `;
+    rucLine += config.direccion;
+  }
+  if (config.telefono) {
+    if (rucLine) rucLine += ` · `;
+    rucLine += `Telf: ${config.telefono}`;
+  }
+  if (!rucLine) {
+    rucLine = "RUC: 10452389712 · San Vicente de Cañete"; // fallback por defecto si todo está vacío
+  }
+
+  return `<!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8"/>
     <title>${venta.codigo}</title>
     <style>
       * { margin:0; padding:0; box-sizing:border-box; }
       body { font-family: Arial, sans-serif; font-size: 11px; padding: 10px; width: 280px; margin: 0 auto; color: #000; }
       .header { text-align:center; padding-bottom: 8px; border-bottom: 1px dashed #000; margin-bottom: 8px; }
-      .header .logo { font-size: 24px; margin-bottom: 4px; }
-      .header h2 { font-size: 16px; font-weight: 700; margin: 2px 0; }
+      .header h2 { font-size: 15px; font-weight: 700; margin: 2px 0; text-transform: uppercase; }
       .header p { font-size: 10px; line-height: 1.3; }
       .tipo { font-weight: 700; font-size: 12px; margin-top: 6px; text-transform: uppercase; }
       .codigo { font-size: 12px; font-weight: 700; margin-top: 2px; }
@@ -45,10 +67,10 @@ export function imprimirBoleta(venta) {
     </style>
   </head><body>
     <div class="header">
-      <div class="logo">🌾</div>
-      <h2>FERCORD</h2>
-      <p>Comercialización de Alimentos Balanceados</p>
-      <p>RUC: 10452389712 · San Vicente de Cañete</p>
+      ${logoHtml}
+      <h2>${nombreEmpresa}</h2>
+      <p>${sloganEmpresa}</p>
+      <p>${rucLine}</p>
       <hr style="border:none;border-top:1px dashed #000;margin:6px 0 4px"/>
       <div class="tipo">${venta.tipo === 'factura' ? 'FACTURA DE VENTA' : 'BOLETA DE VENTA'}</div>
       <div class="codigo">${venta.codigo}</div>
@@ -69,10 +91,24 @@ export function imprimirBoleta(venta) {
           <td colspan="3">TOTAL GENERAL</td>
           <td style="text-align:right">S/ ${venta.total.toFixed(2)}</td>
         </tr>
+        ${venta.estadoPago && venta.estadoPago !== 'pagado' ? `
+        <tr style="font-size: 11px;">
+          <td colspan="3" style="border:none;padding-top:4px;">A cuenta:</td>
+          <td style="text-align:right;border:none;padding-top:4px;">S/ ${(venta.montoPagado || 0).toFixed(2)}</td>
+        </tr>
+        <tr style="font-size: 11.5px;font-weight:700;color:#000;">
+          <td colspan="3" style="border:none;padding-top:2px;">Saldo Pendiente:</td>
+          <td style="text-align:right;border:none;padding-top:2px;">S/ ${(venta.montoDeuda || 0).toFixed(2)}</td>
+        </tr>
+        ` : ''}
       </tfoot>
     </table>
     <div class="gracias">¡Muchas gracias por su preferencia!</div>
   </body></html>`;
+}
+
+export function imprimirBoleta(venta, config = {}) {
+  const html = generarHtmlBoleta(venta, config);
 
   const useSilent = localStorage.getItem('use_silent_print') === 'true';
   const preferredPrinter = localStorage.getItem('preferred_printer') || '';

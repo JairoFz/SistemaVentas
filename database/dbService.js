@@ -51,6 +51,34 @@ class DbService {
       correlativos[row.tipo] = row.siguiente;
     });
 
+    const proveedores = db.prepare("SELECT * FROM proveedores ORDER BY id").all();
+    const compras = db.prepare("SELECT * FROM compras ORDER BY id DESC").all();
+    compras.forEach(c => {
+      c.items = db.prepare("SELECT * FROM compra_items WHERE compraId = ?").all(c.id);
+    });
+
+    const pagosDeuda = db.prepare("SELECT * FROM pagos_deuda ORDER BY id DESC").all();
+    const pagosProveedores = db.prepare("SELECT * FROM pagos_proveedores ORDER BY id DESC").all();
+
+    // 9. Obtener configuración de la empresa
+    const configRows = db.prepare("SELECT * FROM empresa_config").all();
+    const empresaConfig = {
+      nombre: 'FERCORD',
+      ruc: '10452389712',
+      slogan: 'Nutrición Balanceada · Aves y Cerdos',
+      direccion: 'San Vicente de Cañete',
+      telefono: '',
+      logo: ''
+    };
+    configRows.forEach(row => {
+      if (row.clave === 'nombre_empresa') empresaConfig.nombre = row.valor;
+      if (row.clave === 'ruc') empresaConfig.ruc = row.valor;
+      if (row.clave === 'slogan') empresaConfig.slogan = row.valor;
+      if (row.clave === 'direccion') empresaConfig.direccion = row.valor;
+      if (row.clave === 'telefono') empresaConfig.telefono = row.valor;
+      if (row.clave === 'logo_base64') empresaConfig.logo = row.valor;
+    });
+
     return {
       products,
       clients,
@@ -60,7 +88,12 @@ class DbService {
       cajaAbierta,
       movimientosCaja,
       historialCajas,
-      correlativos
+      correlativos,
+      proveedores,
+      compras,
+      pagosDeuda,
+      pagosProveedores,
+      empresaConfig
     };
   }
 
@@ -128,18 +161,18 @@ class DbService {
 
   addClient(c) {
     const stmt = db.prepare(`
-      INSERT INTO clientes (id, nombre, dni, telefono, direccion)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO clientes (id, nombre, dni, telefono, direccion, email)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(c.id, c.nombre, c.dni || '', c.telefono || '', c.direccion || '');
+    stmt.run(c.id, c.nombre, c.dni || '', c.telefono || '', c.direccion || '', c.email || '');
   }
 
   updateClient(c) {
     const stmt = db.prepare(`
-      UPDATE clientes SET nombre = ?, dni = ?, telefono = ?, direccion = ?
+      UPDATE clientes SET nombre = ?, dni = ?, telefono = ?, direccion = ?, email = ?
       WHERE id = ?
     `);
-    stmt.run(c.nombre, c.dni || '', c.telefono || '', c.direccion || '', c.id);
+    stmt.run(c.nombre, c.dni || '', c.telefono || '', c.direccion || '', c.email || '', c.id);
   }
 
   deleteClient(id) {
@@ -196,8 +229,8 @@ class DbService {
     const transaction = db.transaction(() => {
       // 1. Registrar cabecera de la venta
       const insertVenta = db.prepare(`
-        INSERT INTO ventas (id, codigo, fecha, clienteId, clienteNombre, vendedor, metodoPago, tipo, total)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ventas (id, codigo, fecha, clienteId, clienteNombre, vendedor, metodoPago, tipo, total, montoPagado, montoDeuda, estadoPago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       insertVenta.run(
         venta.id,
@@ -208,7 +241,10 @@ class DbService {
         venta.vendedor,
         venta.metodoPago,
         venta.tipo,
-        venta.total
+        venta.total,
+        venta.montoPagado || 0,
+        venta.montoDeuda || 0,
+        venta.estadoPago || 'pagado'
       );
 
       // 2. Registrar los items de la venta y descontar stock correspondientemente
@@ -341,22 +377,28 @@ class DbService {
       // 4. Si la caja diaria está abierta, registrar el ingreso correspondiente
       const cajaAbierta = db.prepare("SELECT * FROM caja_diaria WHERE fechaCierre IS NULL").get();
       if (cajaAbierta) {
-        const insertMov = db.prepare(`
-          INSERT INTO caja_movimientos (cajaDiariaId, tipo, concepto, monto, metodoPago, usuario, fecha)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        insertMov.run(
-          cajaAbierta.id,
-          'Ingreso',
-          `Venta ${venta.codigo}`,
-          venta.total,
-          venta.metodoPago,
-          venta.vendedor,
-          venta.fecha
-        );
+        const efectivoIngresado = venta.estadoPago === 'pendiente' 
+          ? 0 
+          : (venta.estadoPago === 'parcial' ? (venta.montoPagado || 0) : venta.total);
 
-        db.prepare("UPDATE caja_diaria SET ingresos = ingresos + ? WHERE id = ?")
-          .run(venta.total, cajaAbierta.id);
+        if (efectivoIngresado > 0) {
+          const insertMov = db.prepare(`
+            INSERT INTO caja_movimientos (cajaDiariaId, tipo, concepto, monto, metodoPago, usuario, fecha)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `);
+          insertMov.run(
+            cajaAbierta.id,
+            'Ingreso',
+            venta.estadoPago === 'parcial' ? `Venta ${venta.codigo} (A cuenta)` : `Venta ${venta.codigo}`,
+            efectivoIngresado,
+            venta.metodoPago,
+            venta.vendedor,
+            venta.fecha
+          );
+
+          db.prepare("UPDATE caja_diaria SET ingresos = ingresos + ? WHERE id = ?")
+            .run(efectivoIngresado, cajaAbierta.id);
+        }
       }
     });
     transaction();
@@ -461,6 +503,266 @@ class DbService {
       }
     });
     transaction();
+  }
+
+  addProveedor(p) {
+    const info = db.prepare("INSERT INTO proveedores (nombre, ruc, telefono, direccion) VALUES (?, ?, ?, ?)")
+      .run(p.nombre, p.ruc, p.telefono, p.direccion);
+    return { ...p, id: info.lastInsertRowid };
+  }
+  updateProveedor(p) {
+    db.prepare("UPDATE proveedores SET nombre = ?, ruc = ?, telefono = ?, direccion = ? WHERE id = ?")
+      .run(p.nombre, p.ruc, p.telefono, p.direccion, p.id);
+    return true;
+  }
+  deleteProveedor(id) {
+    db.prepare("DELETE FROM proveedores WHERE id = ?").run(id);
+    return true;
+  }
+
+  registrarCompra(c) {
+    const transaction = db.transaction(() => {
+      const info = db.prepare(`
+        INSERT INTO compras (fecha, total, proveedorId, proveedorNombre, documento, usuario, montoPagado, montoDeuda, estadoPago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        c.fecha,
+        c.total,
+        c.proveedorId || null,
+        c.proveedorNombre || '',
+        c.documento || '',
+        c.usuario || '',
+        c.montoPagado !== undefined ? c.montoPagado : c.total,
+        c.montoDeuda !== undefined ? c.montoDeuda : 0,
+        c.estadoPago || 'pagado'
+      );
+      const compraId = info.lastInsertRowid;
+
+      c.items.forEach(item => {
+        const itemTotal = item.cantidad * item.precioCosto;
+        db.prepare(`
+          INSERT INTO compra_items (compraId, productoId, productoNombre, cantidad, precioCosto, lote, fechaVencimiento, total)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          compraId,
+          item.productoId,
+          item.productoNombre,
+          item.cantidad,
+          item.precioCosto,
+          item.lote || '',
+          item.fechaVencimiento || '',
+          itemTotal
+        );
+
+        const p = db.prepare("SELECT * FROM productos WHERE id = ?").get(item.productoId);
+        if (p) {
+          let nuevosSacos = p.sacos || 0;
+          let nuevasUnidades = p.unidades || 0;
+          let deltaSacos = 0;
+          let deltaUnidades = 0;
+
+          if (p.tipoVenta === 'unidad') {
+            nuevasUnidades = Math.max(0, nuevasUnidades + item.cantidad);
+            deltaUnidades = item.cantidad;
+          } else {
+            nuevosSacos = Math.max(0, nuevosSacos + item.cantidad);
+            deltaSacos = item.cantidad;
+          }
+
+          db.prepare(`
+            UPDATE productos 
+            SET sacos = ?, unidades = ?, precioCosto = ?, 
+                lote = CASE WHEN ? != '' THEN ? ELSE lote END, 
+                fechaVencimiento = CASE WHEN ? != '' THEN ? ELSE fechaVencimiento END
+            WHERE id = ?
+          `).run(
+            nuevosSacos,
+            nuevasUnidades,
+            item.precioCosto,
+            item.lote || '',
+            item.lote || '',
+            item.fechaVencimiento || '',
+            item.fechaVencimiento || '',
+            item.productoId
+          );
+
+          const nota = `Compra Proveedor: ${c.proveedorNombre || 'Proveedor'} (Lote: ${item.lote || '—'})${c.documento ? ` Ref: ${c.documento}` : ''}`;
+          db.prepare(`
+            INSERT INTO kardex (fecha, producto, productoId, tipo, deltaSacos, deltaKg, deltaUnidades, nota, usuario)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            c.fecha,
+            p.nombre,
+            item.productoId,
+            'Compra Proveedor',
+            deltaSacos,
+            0,
+            deltaUnidades,
+            nota,
+            c.usuario || ''
+          );
+        }
+      });
+
+      return { ...c, id: compraId };
+    });
+    return transaction();
+  }
+
+  registrarAbonoCliente(abono) {
+    const transaction = db.transaction(() => {
+      const insertPago = db.prepare(`
+        INSERT INTO pagos_deuda (fecha, clienteId, clienteNombre, monto, metodoPago, usuario, cajaDiariaId)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      const cajaAbierta = db.prepare("SELECT * FROM caja_diaria WHERE fechaCierre IS NULL").get();
+      const cajaId = cajaAbierta ? cajaAbierta.id : null;
+      
+      const info = insertPago.run(
+        abono.fecha,
+        abono.clienteId,
+        abono.clienteNombre,
+        abono.monto,
+        abono.metodoPago,
+        abono.usuario || '',
+        cajaId
+      );
+
+      const ventasPendientes = db.prepare(`
+        SELECT * FROM ventas 
+        WHERE clienteId = ? AND estadoPago IN ('pendiente', 'parcial') AND montoDeuda > 0
+        ORDER BY id ASC
+      `).all(abono.clienteId);
+
+      let montoRestante = abono.monto;
+
+      for (const v of ventasPendientes) {
+        if (montoRestante <= 0) break;
+
+        const deudaVenta = v.montoDeuda;
+        if (montoRestante >= deudaVenta) {
+          db.prepare(`
+            UPDATE ventas 
+            SET montoPagado = total, montoDeuda = 0, estadoPago = 'pagado'
+            WHERE id = ?
+          `).run(v.id);
+          montoRestante -= deudaVenta;
+        } else {
+          const nuevoPagado = (v.montoPagado || 0) + montoRestante;
+          const nuevaDeuda = deudaVenta - montoRestante;
+          db.prepare(`
+            UPDATE ventas 
+            SET montoPagado = ?, montoDeuda = ?, estadoPago = 'parcial'
+            WHERE id = ?
+          `).run(nuevoPagado, nuevaDeuda, v.id);
+          montoRestante = 0;
+        }
+      }
+
+      if (cajaAbierta) {
+        db.prepare(`
+          INSERT INTO caja_movimientos (cajaDiariaId, tipo, concepto, monto, metodoPago, usuario, fecha)
+          VALUES (?, 'Ingreso', ?, ?, ?, ?, ?)
+        `).run(
+          cajaAbierta.id,
+          `Cobro Crédito: ${abono.clienteNombre}`,
+          abono.monto,
+          abono.metodoPago,
+          abono.usuario || '',
+          abono.fecha
+        );
+
+        db.prepare("UPDATE caja_diaria SET ingresos = ingresos + ? WHERE id = ?")
+          .run(abono.monto, cajaAbierta.id);
+      }
+
+      return { ...abono, id: info.lastInsertRowid };
+    });
+    return transaction();
+  }
+
+  registrarAbonoProveedor(abono) {
+    const transaction = db.transaction(() => {
+      const insertPago = db.prepare(`
+        INSERT INTO pagos_proveedores (fecha, proveedorId, proveedorNombre, monto, metodoPago, usuario, cajaDiariaId)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      const cajaAbierta = db.prepare("SELECT * FROM caja_diaria WHERE fechaCierre IS NULL").get();
+      const cajaId = cajaAbierta ? cajaAbierta.id : null;
+      
+      const info = insertPago.run(
+        abono.fecha,
+        abono.proveedorId,
+        abono.proveedorNombre,
+        abono.monto,
+        abono.metodoPago,
+        abono.usuario || '',
+        cajaId
+      );
+
+      const comprasPendientes = db.prepare(`
+        SELECT * FROM compras 
+        WHERE proveedorId = ? AND estadoPago IN ('pendiente', 'parcial') AND montoDeuda > 0
+        ORDER BY id ASC
+      `).all(abono.proveedorId);
+
+      let montoRestante = abono.monto;
+
+      for (const comp of comprasPendientes) {
+        if (montoRestante <= 0) break;
+
+        const deudaCompra = comp.montoDeuda;
+        if (montoRestante >= deudaCompra) {
+          db.prepare(`
+            UPDATE compras 
+            SET montoPagado = total, montoDeuda = 0, estadoPago = 'pagado'
+            WHERE id = ?
+          `).run(comp.id);
+          montoRestante -= deudaCompra;
+        } else {
+          const nuevoPagado = (comp.montoPagado || 0) + montoRestante;
+          const nuevaDeuda = deudaCompra - montoRestante;
+          db.prepare(`
+            UPDATE compras 
+            SET montoPagado = ?, montoDeuda = ?, estadoPago = 'parcial'
+            WHERE id = ?
+          `).run(nuevoPagado, nuevaDeuda, comp.id);
+          montoRestante = 0;
+        }
+      }
+
+      if (cajaAbierta) {
+        db.prepare(`
+          INSERT INTO caja_movimientos (cajaDiariaId, tipo, concepto, monto, metodoPago, usuario, fecha)
+          VALUES (?, 'Gasto / Salida', ?, ?, ?, ?, ?)
+        `).run(
+          cajaAbierta.id,
+          `Pago Deuda Prov: ${abono.proveedorNombre}`,
+          abono.monto,
+          abono.metodoPago,
+          abono.usuario || '',
+          abono.fecha
+        );
+
+        db.prepare("UPDATE caja_diaria SET egresos = egresos + ? WHERE id = ?")
+          .run(abono.monto, cajaAbierta.id);
+      }
+
+      return { ...abono, id: info.lastInsertRowid };
+    });
+    return transaction();
+  }
+  updateEmpresaConfig(config) {
+    const stmt = db.prepare("INSERT OR REPLACE INTO empresa_config (clave, valor) VALUES (?, ?)");
+    if (config.nombre !== undefined) stmt.run('nombre_empresa', config.nombre);
+    if (config.ruc !== undefined) stmt.run('ruc', config.ruc);
+    if (config.slogan !== undefined) stmt.run('slogan', config.slogan);
+    if (config.direccion !== undefined) stmt.run('direccion', config.direccion);
+    if (config.telefono !== undefined) stmt.run('telefono', config.telefono);
+    if (config.logo !== undefined) stmt.run('logo_base64', config.logo);
+    return { success: true };
   }
 }
 

@@ -1,6 +1,7 @@
 import "./index.css";
 import { AppProvider, useApp } from "./context/AppContext";
 import logo from "./assets/FERCORD.ico";
+import fercordLogo from "./assets/fercord_logo.jpg";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import CajaPOS from "./pages/CajaPOS";
@@ -11,6 +12,8 @@ import Kardex from "./pages/Kardex";
 import Perfil from "./pages/Perfil";
 import CajaDiaria from "./pages/CajaDiaria";
 import { Reportes, Usuarios } from "./pages/OtherPages";
+import Compras from "./pages/Compras";
+import MiEmpresa from "./pages/MiEmpresa";
 import { useState } from "react";
 import {
   LayoutDashboard,
@@ -24,6 +27,8 @@ import {
   UserCog,
   User,
   LogOut,
+  ShoppingBag,
+  Building,
 } from "lucide-react";
 
 const NAV = [
@@ -32,10 +37,12 @@ const NAV = [
   { id: "ventas", label: "Ventas / Boletas", icon: Receipt },
   { id: "clientes", label: "Clientes", icon: Users },
   { id: "productos", label: "Productos", icon: Package },
+  { id: "compras", label: "Compras / Prov", icon: ShoppingBag },
   { id: "kardex", label: "Kárdex / Almacén", icon: BookOpen },
   { id: "caja", label: "Caja diaria", icon: Wallet },
   { id: "reportes", label: "Reportes", icon: BarChart2 },
   { id: "usuarios", label: "Usuarios", icon: UserCog },
+  { id: "empresa", label: "Mi Empresa", icon: Building },
   { id: "perfil", label: "Perfil", icon: User },
 ];
 
@@ -46,6 +53,10 @@ function MainApp() {
   if (!currentUser) return <Login />;
 
   const renderPage = () => {
+    if (currentUser.rol !== "admin" && !["dashboard", "pos", "clientes", "productos", "caja", "perfil"].includes(page)) {
+      return <Dashboard />;
+    }
+
     switch (page) {
       case "dashboard":
         return <Dashboard />;
@@ -57,6 +68,8 @@ function MainApp() {
         return <Clientes />;
       case "productos":
         return <Productos />;
+      case "compras":
+        return <Compras />;
       case "kardex":
         return <Kardex />;
       case "caja":
@@ -65,6 +78,8 @@ function MainApp() {
         return <Reportes />;
       case "usuarios":
         return <Usuarios />;
+      case "empresa":
+        return <MiEmpresa />;
       case "perfil":
         return <Perfil />;
       default:
@@ -72,19 +87,28 @@ function MainApp() {
     }
   };
 
-  const navItems =
-    currentUser.rol === "admin" ? NAV : NAV.filter((n) => n.id !== "usuarios");
+  const navItems = currentUser.rol === "admin"
+    ? NAV
+    : NAV.filter((n) => ["dashboard", "pos", "clientes", "productos", "caja", "perfil"].includes(n.id));
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-logo">🌾</div>
-          <div>
-            <div className="brand-name">FERCORD</div>
-            <div className="brand-sub">Nutrición Balanceada</div>
-          </div>
-        </div>
+        {(() => {
+          const { empresaConfig } = useApp();
+          const logoSrc = empresaConfig.logo ? empresaConfig.logo : fercordLogo;
+          const brandName = empresaConfig.nombre || "FERCORD";
+          const brandSub = empresaConfig.slogan || "Nutrición Balanceada";
+          return (
+            <div className="sidebar-brand">
+              <img src={logoSrc} alt="Logo" className="brand-logo" style={{ objectFit: 'cover', borderRadius: '50%' }} />
+              <div>
+                <div className="brand-name" style={{ textTransform: 'uppercase', fontSize: 13 }}>{brandName}</div>
+                <div className="brand-sub" style={{ fontSize: 10 }}>{brandSub}</div>
+              </div>
+            </div>
+          );
+        })()}
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const Icon = item.icon;

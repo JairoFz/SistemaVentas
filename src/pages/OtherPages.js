@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Download, FileText, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export function Reportes() {
-  const { ventas, historialCajas, movimientosCaja, cajaAbierta } = useApp();
+  const { ventas, historialCajas, movimientosCaja, cajaAbierta, empresaConfig } = useApp();
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
 
@@ -47,10 +48,78 @@ export function Reportes() {
     URL.revokeObjectURL(url);
   };
 
+  const descargarExcel = () => {
+    const porProducto = {};
+    filtradas.forEach(v => {
+      (v.items || []).forEach(item => {
+        if (!porProducto[item.nombre]) porProducto[item.nombre] = { nombre: item.nombre, cantidad: 0, total: 0 };
+        porProducto[item.nombre].cantidad += item.cantidad;
+        porProducto[item.nombre].total += item.subtotal;
+      });
+    });
+    const rankingProductos = Object.values(porProducto).sort((a, b) => b.total - a.total);
+
+    const wsVentasData = [
+      ['Código', 'Fecha', 'Cliente', 'Documento', 'Dirección', 'Vendedor', 'Método Pago', 'Tipo', 'Monto de Venta (S/)', 'Costo de Venta (S/)']
+    ];
+    filtradas.forEach(v => {
+      const costoVenta = (v.items || []).reduce((sum, item) => sum + (parseFloat(item.costoTotal) || 0), 0);
+      wsVentasData.push([
+        v.codigo,
+        new Date(v.fecha).toLocaleString('es-PE'),
+        v.clienteNombre,
+        v.clienteDocumento || '—',
+        v.clienteDireccion || '—',
+        v.vendedor,
+        v.metodoPago,
+        v.tipo === 'factura' ? 'Factura' : 'Boleta',
+        v.total,
+        costoVenta
+      ]);
+    });
+    wsVentasData.push([]);
+    wsVentasData.push(['TOTALES', '', '', '', '', '', '', '', totalVentas, totalCostoVentas]);
+    wsVentasData.push(['UTILIDAD BRUTA (Ventas - Costos)', '', '', '', '', '', '', '', totalVentas - totalCostoVentas]);
+    wsVentasData.push(['TOTAL GASTOS OPERATIVOS', '', '', '', '', '', '', '', totalGastos]);
+    wsVentasData.push(['UTILIDAD NETA REAL', '', '', '', '', '', '', '', gananciaNeta]);
+
+    const wsProductosData = [
+      ['Producto', 'Cantidad Vendida', 'Total Recaudado (S/)']
+    ];
+    rankingProductos.forEach(p => {
+      wsProductosData.push([p.nombre, p.cantidad, p.total]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const wsVentas = XLSX.utils.aoa_to_sheet(wsVentasData);
+    const wsProductos = XLSX.utils.aoa_to_sheet(wsProductosData);
+
+    XLSX.utils.book_append_sheet(wb, wsVentas, 'Detalle Ventas');
+    XLSX.utils.book_append_sheet(wb, wsProductos, 'Ranking Productos');
+
+    XLSX.writeFile(wb, `reporte_ventas_${Date.now()}.xlsx`);
+  };
+
   const imprimirPDF = () => {
     const win = window.open('', '_blank', 'width=900,height=700');
     const fechaDesde = desde ? new Date(desde).toLocaleDateString('es-PE') : 'Inicio';
     const fechaHasta = hasta ? new Date(hasta + 'T23:59:59').toLocaleDateString('es-PE') : 'Hoy';
+
+    const logoSrc = empresaConfig.logo ? empresaConfig.logo : '';
+    const logoHtml = logoSrc 
+      ? `<img src="${logoSrc}" alt="Logo" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin-right: 12px; display: inline-block; vertical-align: middle;" />` 
+      : `<span style="font-size: 24px; margin-right: 10px; vertical-align: middle;">🌾</span>`;
+    const brandName = empresaConfig.nombre || "FERCORD";
+    const brandSub = empresaConfig.slogan || "Nutrición Balanceada · Aves y Cerdos";
+    
+    let infoEmpresaHtml = '';
+    let infoEmpresaArray = [];
+    if (empresaConfig.ruc) infoEmpresaArray.push(`RUC: ${empresaConfig.ruc}`);
+    if (empresaConfig.direccion) infoEmpresaArray.push(empresaConfig.direccion);
+    if (empresaConfig.telefono) infoEmpresaArray.push(`Telf: ${empresaConfig.telefono}`);
+    if (infoEmpresaArray.length > 0) {
+      infoEmpresaHtml = `<p style="color: #666; font-size: 11px; margin-top: 3px;">${infoEmpresaArray.join(' · ')}</p>`;
+    }
 
     const porProducto = {};
     filtradas.forEach(v => {
@@ -94,7 +163,7 @@ export function Reportes() {
       : '<tr><td colspan="4" style="text-align:center;color:#999;padding:16px">Sin gastos en el período</td></tr>';
 
     win.document.write(`<!DOCTYPE html><html lang="es"><head>
-      <meta charset="UTF-8"/><title>Reporte FERCORD</title>
+      <meta charset="UTF-8"/><title>Reporte - ${brandName}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; padding: 32px; }
@@ -130,7 +199,14 @@ export function Reportes() {
       </style>
     </head><body>
       <div class="header">
-        <div class="brand"><h1>🌾 FERCORD</h1><p>Nutrición Balanceada · Aves y Cerdos</p></div>
+        <div class="brand" style="display: flex; align-items: center; gap: 12px;">
+          ${logoHtml}
+          <div>
+            <h1 style="font-size: 22px; color: #2d5a27; font-weight: 700; text-transform: uppercase; line-height: 1.1; margin: 0;">${brandName}</h1>
+            <p style="color: #666; font-size: 11px; margin-top: 3px;">${brandSub}</p>
+            ${infoEmpresaHtml}
+          </div>
+        </div>
         <div class="reporte-info">
           <h2>REPORTE DE VENTAS Y GASTOS</h2>
           <p>Período: ${fechaDesde} — ${fechaHasta}</p>
@@ -225,7 +301,8 @@ export function Reportes() {
 
         <div style={{display:'flex',gap:10}}>
           <button className="btn btn-primary" onClick={imprimirPDF}><FileText size={15}/>Generar PDF</button>
-          <button className="btn btn-outline" onClick={descargarCSV}><Download size={15}/>Descargar CSV</button>
+          <button className="btn btn-outline" onClick={descargarExcel}><Download size={15}/>Exportar Excel (.xlsx)</button>
+          <button className="btn btn-outline" style={{borderColor:'var(--border)',color:'var(--text-mid)'}} onClick={descargarCSV}><Download size={15}/>Descargar CSV</button>
         </div>
         <p style={{marginTop:12,fontSize:12,color:'var(--text-light)'}}>
           El PDF incluye ventas, gastos de caja, neto del período y productos más vendidos.

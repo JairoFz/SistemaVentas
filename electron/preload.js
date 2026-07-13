@@ -19,6 +19,13 @@ contextBridge.exposeInMainWorld('api', {
     dbCerrarCaja: (resumen) => ipcRenderer.invoke('db:cerrar-caja', resumen),
     dbAgregarMovimientoCaja: (mov) => ipcRenderer.invoke('db:agregar-movimiento-caja', mov),
     dbIngresarStock: (op) => ipcRenderer.invoke('db:ingresar-stock', op),
+    dbAddProveedor: (p) => ipcRenderer.invoke('db:add-proveedor', p),
+    dbUpdateProveedor: (p) => ipcRenderer.invoke('db:update-proveedor', p),
+    dbDeleteProveedor: (id) => ipcRenderer.invoke('db:delete-proveedor', id),
+    dbRegistrarCompra: (c) => ipcRenderer.invoke('db:registrar-compra', c),
+    dbRegistrarAbono: (abono) => ipcRenderer.invoke('db:registrar-abono', abono),
+    dbRegistrarAbonoProveedor: (abono) => ipcRenderer.invoke('db:registrar-abono-proveedor', abono),
+    dbUpdateEmpresaConfig: (config) => ipcRenderer.invoke('db:update-empresa-config', config),
 
     // Autenticación y Backups
     authLogin: (email, password) => ipcRenderer.invoke('auth:login', email, password),
@@ -29,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
     // Impresión Silenciosa y SUNAT API
     printGetPrinters: () => ipcRenderer.invoke('print:get-printers'),
     printTicket: (html, printerName, silent) => ipcRenderer.invoke('print:ticket', { html, printerName, silent }),
+    printExportPdf: (html, filename) => ipcRenderer.invoke('print:export-pdf', { html, filename }),
     consultarDni: (dni, token) => ipcRenderer.invoke('api:consultar-dni', { dni, token }),
     consultarRuc: (ruc, token) => ipcRenderer.invoke('api:consultar-ruc', { ruc, token }),
 });

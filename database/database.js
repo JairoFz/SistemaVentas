@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     nombre TEXT NOT NULL,
     dni TEXT,
     telefono TEXT,
-    direccion TEXT
+    direccion TEXT,
+    email TEXT
 )
 `).run();
 
@@ -75,7 +76,10 @@ CREATE TABLE IF NOT EXISTS ventas (
     vendedor TEXT,
     metodoPago TEXT,
     tipo TEXT,
-    total REAL
+    total REAL,
+    montoPagado REAL DEFAULT 0,
+    montoDeuda REAL DEFAULT 0,
+    estadoPago TEXT DEFAULT 'pagado'
 )
 `).run();
 
@@ -137,6 +141,13 @@ try { db.prepare("ALTER TABLE caja_diaria ADD COLUMN notaCierre TEXT").run(); } 
 try { db.prepare("ALTER TABLE productos ADD COLUMN stockMinimo INTEGER DEFAULT 5").run(); } catch(e) {}
 try { db.prepare("ALTER TABLE productos ADD COLUMN lote TEXT").run(); } catch(e) {}
 try { db.prepare("ALTER TABLE productos ADD COLUMN fechaVencimiento TEXT").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE ventas ADD COLUMN montoPagado REAL DEFAULT 0").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE ventas ADD COLUMN montoDeuda REAL DEFAULT 0").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE ventas ADD COLUMN estadoPago TEXT DEFAULT 'pagado'").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE clientes ADD COLUMN email TEXT").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE compras ADD COLUMN montoPagado REAL DEFAULT 0").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE compras ADD COLUMN montoDeuda REAL DEFAULT 0").run(); } catch(e) {}
+try { db.prepare("ALTER TABLE compras ADD COLUMN estadoPago TEXT DEFAULT 'pagado'").run(); } catch(e) {}
 
 // Crear tabla caja_movimientos
 db.prepare(`
@@ -214,6 +225,106 @@ const fCount = db.prepare("SELECT COUNT(*) as count FROM correlativos WHERE tipo
 if (fCount.count === 0) {
   db.prepare("INSERT INTO correlativos (tipo, siguiente) VALUES ('factura', 0)").run();
 }
+
+// Migración de tabla compras antigua si contiene productoId (estructura plana vieja)
+try {
+  const columns = db.prepare("PRAGMA table_info(compras)").all();
+  const hasProductoId = columns.some(c => c.name === 'productoId');
+  if (hasProductoId) {
+    db.prepare("DROP TABLE compras").run();
+  }
+} catch(e) {}
+
+// Crear tabla proveedores
+db.prepare(`
+CREATE TABLE IF NOT EXISTS proveedores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    ruc TEXT,
+    telefono TEXT,
+    direccion TEXT
+)
+`).run();
+
+// Crear tabla compras
+db.prepare(`
+CREATE TABLE IF NOT EXISTS compras (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    total REAL NOT NULL,
+    proveedorId INTEGER,
+    proveedorNombre TEXT,
+    documento TEXT,
+    usuario TEXT,
+    montoPagado REAL DEFAULT 0,
+    montoDeuda REAL DEFAULT 0,
+    estadoPago TEXT DEFAULT 'pagado'
+)
+`).run();
+
+// Crear tabla compra_items
+db.prepare(`
+CREATE TABLE IF NOT EXISTS compra_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    compraId INTEGER NOT NULL REFERENCES compras(id) ON DELETE CASCADE,
+    productoId INTEGER NOT NULL,
+    productoNombre TEXT NOT NULL,
+    cantidad INTEGER NOT NULL,
+    precioCosto REAL NOT NULL,
+    lote TEXT,
+    fechaVencimiento TEXT,
+    total REAL NOT NULL
+)
+`).run();
+
+// Crear tabla pagos_deuda
+db.prepare(`
+CREATE TABLE IF NOT EXISTS pagos_deuda (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    clienteId INTEGER NOT NULL,
+    clienteNombre TEXT NOT NULL,
+    monto REAL NOT NULL,
+    metodoPago TEXT NOT NULL,
+    usuario TEXT,
+    cajaDiariaId INTEGER
+)
+`).run();
+
+// Crear tabla pagos_proveedores
+db.prepare(`
+CREATE TABLE IF NOT EXISTS pagos_proveedores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    proveedorId INTEGER NOT NULL REFERENCES proveedores(id) ON DELETE CASCADE,
+    proveedorNombre TEXT NOT NULL,
+    monto REAL NOT NULL,
+    metodoPago TEXT NOT NULL,
+    usuario TEXT,
+    cajaDiariaId INTEGER
+)
+`).run();
+
+// Crear tabla empresa_config
+db.prepare(`
+CREATE TABLE IF NOT EXISTS empresa_config (
+    clave TEXT PRIMARY KEY,
+    valor TEXT
+)
+`).run();
+
+const seedConfig = (clave, valor) => {
+  const exists = db.prepare("SELECT 1 FROM empresa_config WHERE clave = ?").get(clave);
+  if (!exists) {
+    db.prepare("INSERT INTO empresa_config (clave, valor) VALUES (?, ?)").run(clave, valor);
+  }
+};
+seedConfig('nombre_empresa', 'FERCORD');
+seedConfig('ruc', '10452389712');
+seedConfig('slogan', 'Nutrición Balanceada · Aves y Cerdos');
+seedConfig('direccion', 'San Vicente de Cañete');
+seedConfig('telefono', '');
+seedConfig('logo_base64', '');
 
 console.log("✅ Base de datos conectada.");
 console.log("📁 Path de Base de Datos:", dbPath);
